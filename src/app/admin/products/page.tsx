@@ -80,6 +80,7 @@ export default function AdminProductsPage() {
 
     const initialCategories = Object.entries(categoriesMap).map(([name, count]) => ({ id: name, name, count }));
     setOrderedCategories(initialCategories);
+    document.title = "產品系列 - 智能點餐AI";
   }, []);
 
   const sensors = useSensors(
@@ -137,13 +138,14 @@ export default function AdminProductsPage() {
               {orderedCategories.map((categoryItem) => (
                 <SortableCategoryCard key={categoryItem.id} categoryItem={categoryItem}>
                   <Card className="h-full flex flex-col justify-between hover:shadow-lg transition-shadow duration-300 ease-in-out transform hover:-translate-y-1">
-                    <Link href={`/admin/products/${encodeURIComponent(categoryItem.name)}`} legacyBehavior>
-                      <a className="block hover:no-underline flex-grow p-1">
+                    <Link 
+                      href={`/admin/products/${encodeURIComponent(categoryItem.name)}`} 
+                      className="block hover:no-underline flex-grow p-1"
+                    >
                         <CardHeader>
                           <CardTitle className="text-2xl font-headline text-primary">{categoryItem.name}</CardTitle>
                           <CardDescription>{categoryItem.count} 種產品</CardDescription>
                         </CardHeader>
-                      </a>
                     </Link>
                   </Card>
                 </SortableCategoryCard>
