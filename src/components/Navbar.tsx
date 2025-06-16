@@ -26,7 +26,7 @@ const Navbar = () => {
           </Link>
           <div className="flex items-center space-x-2 sm:space-x-4">
             {navItems.map((item) => (
-              <Link key={item.href} href={item.href} legacyBehavior passHref>
+              <Link key={item.href} href={item.href}>
                 <Button
                   variant={pathname === item.href ? 'default' : 'ghost'}
                   className={cn(
