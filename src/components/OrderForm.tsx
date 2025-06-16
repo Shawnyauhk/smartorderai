@@ -21,8 +21,8 @@ const OrderForm: React.FC<OrderFormProps> = ({ onOrderSubmit, isProcessing }) =>
     e.preventDefault();
     if (!orderText.trim()) {
       toast({
-        title: "Empty Order",
-        description: "Please enter your order details.",
+        title: "訂單空白",
+        description: "請輸入您的訂單詳情。",
         variant: "destructive",
       });
       return;
@@ -30,14 +30,11 @@ const OrderForm: React.FC<OrderFormProps> = ({ onOrderSubmit, isProcessing }) =>
     await onOrderSubmit(orderText);
   };
 
-  // Placeholder for actual voice input functionality
   const handleVoiceInput = () => {
     toast({
-      title: "Voice Input",
-      description: "Voice input is not yet implemented. Please type your order.",
+      title: "語音輸入",
+      description: "語音輸入功能尚未實現。請手動輸入您的訂單。",
     });
-    // Example of setting text if voice input worked:
-    // setOrderText("I'd like one classic burger and two cokes.");
   };
 
   return (
@@ -45,17 +42,17 @@ const OrderForm: React.FC<OrderFormProps> = ({ onOrderSubmit, isProcessing }) =>
       <CardHeader>
         <CardTitle className="font-headline text-3xl text-primary flex items-center">
           <Mic className="w-8 h-8 mr-3 text-accent" />
-          Place Your Order
+          開始點餐
         </CardTitle>
         <CardDescription className="text-lg">
-          Tell us what you'd like! You can type your order below. For example: "I want two cheese burgers with extra pickles, one large fries, and a coke."
+          請告訴我們您想點什麼！您可以在下方輸入您的訂單。例如：「我想要兩個芝士漢堡加雙份酸黃瓜，一份大薯條和一杯可樂。」
         </CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit}>
         <CardContent>
           <div className="grid w-full gap-4">
             <Textarea
-              placeholder="Type your order here..."
+              placeholder="請在此輸入您的訂單..."
               value={orderText}
               onChange={(e) => setOrderText(e.target.value)}
               rows={5}
@@ -69,10 +66,10 @@ const OrderForm: React.FC<OrderFormProps> = ({ onOrderSubmit, isProcessing }) =>
               variant="outline" 
               className="w-full sm:w-auto justify-start sm:justify-center group"
               disabled={isProcessing}
-              aria-label="Use voice input (simulated)"
+              aria-label="使用語音輸入 (模擬)"
             >
               <Mic className="w-5 h-5 mr-2 group-hover:text-primary transition-colors" /> 
-              Use Voice Input (Simulated)
+              使用語音輸入 (模擬)
             </Button>
           </div>
         </CardContent>
@@ -81,14 +78,14 @@ const OrderForm: React.FC<OrderFormProps> = ({ onOrderSubmit, isProcessing }) =>
             type="submit" 
             className="w-full bg-accent text-accent-foreground hover:bg-accent/90 text-lg py-6 group transition-all duration-300 ease-in-out transform hover:scale-105" 
             disabled={isProcessing}
-            aria-label="Process Order"
+            aria-label="處理訂單"
           >
             {isProcessing ? (
               <Loader2 className="mr-2 h-6 w-6 animate-spin" />
             ) : (
               <Send className="mr-2 h-6 w-6 group-hover:animate-ping-once" style={{ '--ping-duration': '0.8s' } as React.CSSProperties} />
             )}
-            {isProcessing ? 'Processing...' : 'Process Order'}
+            {isProcessing ? '處理中...' : '處理訂單'}
           </Button>
         </CardFooter>
       </form>

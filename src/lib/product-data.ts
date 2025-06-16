@@ -8,7 +8,7 @@ export const mockProducts: Product[] = [
     category: 'Burgers', 
     imageUrl: 'https://placehold.co/300x200.png', 
     "data-ai-hint": 'burger food',
-    description: 'A juicy beef patty with lettuce, tomato, and our special sauce.' 
+    description: '多汁牛肉餅配生菜、番茄及秘製醬汁。' 
   },
   { 
     id: '2', 
@@ -17,7 +17,7 @@ export const mockProducts: Product[] = [
     category: 'Burgers', 
     imageUrl: 'https://placehold.co/300x200.png', 
     "data-ai-hint": 'cheeseburger food',
-    description: 'Classic burger with a slice of cheddar cheese.' 
+    description: '經典漢堡配車打芝士。' 
   },
   { 
     id: '3', 
@@ -26,7 +26,7 @@ export const mockProducts: Product[] = [
     category: 'Sides', 
     imageUrl: 'https://placehold.co/300x200.png', 
     "data-ai-hint": 'fries food',
-    description: 'Crispy golden french fries.' 
+    description: '香脆金黃炸薯條。' 
   },
   { 
     id: '4', 
@@ -35,7 +35,7 @@ export const mockProducts: Product[] = [
     category: 'Drinks', 
     imageUrl: 'https://placehold.co/300x200.png', 
     "data-ai-hint": 'soda drink',
-    description: 'Chilled Coca-Cola.' 
+    description: '冰鎮可口可樂。' 
   },
   { 
     id: '5', 
@@ -44,7 +44,7 @@ export const mockProducts: Product[] = [
     category: 'Pizza', 
     imageUrl: 'https://placehold.co/300x200.png', 
     "data-ai-hint": 'pizza food',
-    description: 'Classic pizza with tomato, mozzarella, and basil.' 
+    description: '經典薄餅配番茄、水牛芝士及羅勒。' 
   },
   { 
     id: '6', 
@@ -53,7 +53,7 @@ export const mockProducts: Product[] = [
     category: 'Salads', 
     imageUrl: 'https://placehold.co/300x200.png', 
     "data-ai-hint": 'salad food',
-    description: 'Fresh romaine lettuce with Caesar dressing, croutons, and parmesan.' 
+    description: '新鮮羅馬生菜配凱撒醬、麵包粒及巴馬臣芝士。' 
   },
   {
     id: '7',
@@ -62,7 +62,7 @@ export const mockProducts: Product[] = [
     category: 'Pasta',
     imageUrl: 'https://placehold.co/300x200.png',
     "data-ai-hint": 'pasta dish',
-    description: 'Creamy pasta with pancetta, egg yolk, and pecorino romano.'
+    description: '香滑卡邦尼意粉配煙肉、蛋黃及羊奶芝士。'
   },
   {
     id: '8',
@@ -71,7 +71,7 @@ export const mockProducts: Product[] = [
     category: 'Desserts',
     imageUrl: 'https://placehold.co/300x200.png',
     "data-ai-hint": 'chocolate cake',
-    description: 'Warm chocolate cake with a gooey molten center, served with vanilla ice cream.'
+    description: '暖心朱古力熔岩蛋糕配雲呢拿雪糕。'
   },
   {
     id: '9',
@@ -80,12 +80,10 @@ export const mockProducts: Product[] = [
     category: 'Drinks',
     imageUrl: 'https://placehold.co/300x200.png',
     "data-ai-hint": 'iced tea',
-    description: 'Refreshing freshly brewed iced tea.'
+    description: '清爽鮮泡冰茶。'
   }
 ];
 
-// Helper function to find a product by name (case-insensitive)
-// This is a very basic search, could be improved with fuzzy matching
 export const findProductByName = (name: string): Product | undefined => {
   const searchTerm = name.toLowerCase();
   return mockProducts.find(p => p.name.toLowerCase() === searchTerm);

@@ -15,9 +15,9 @@ interface PaymentSelectorProps {
 }
 
 const paymentOptions = [
-  { id: 'credit-card', label: 'Credit Card', icon: CreditCard },
-  { id: 'cash', label: 'Cash', icon: DollarSign },
-  { id: 'mobile-payment', label: 'Mobile Payment', icon: Smartphone },
+  { id: 'credit-card', label: '信用卡', icon: CreditCard },
+  { id: 'cash', label: '現金', icon: DollarSign },
+  { id: 'mobile-payment', label: '移動支付', icon: Smartphone },
 ];
 
 const PaymentSelector: React.FC<PaymentSelectorProps> = ({ onPaymentSelect, totalAmount }) => {
@@ -28,28 +28,31 @@ const PaymentSelector: React.FC<PaymentSelectorProps> = ({ onPaymentSelect, tota
   const handlePayment = async () => {
     if (!selectedMethod) {
       toast({
-        title: "Payment Method Required",
-        description: "Please select a payment method.",
+        title: "請選擇付款方式",
+        description: "請選擇一種付款方式以繼續。",
         variant: "destructive",
       });
       return;
     }
     setIsProcessingPayment(true);
-    // Simulate payment processing
     await new Promise(resolve => setTimeout(resolve, 2000));
     onPaymentSelect(selectedMethod);
+    
+    // Find the selected payment option to get its label for the toast message
+    const selectedOptionDetails = paymentOptions.find(option => option.id === selectedMethod);
+    const paymentMethodLabel = selectedOptionDetails ? selectedOptionDetails.label : selectedMethod;
+
     toast({
-      title: "Payment Successful!",
-      description: `Your order for $${totalAmount.toFixed(2)} with ${selectedMethod} has been confirmed.`,
+      title: "付款成功！",
+      description: `您使用 ${paymentMethodLabel} 支付的 HK$${totalAmount.toFixed(2)} 訂單已確認。`,
       variant: "default",
       className: "bg-green-500 text-white border-green-600"
     });
     setIsProcessingPayment(false);
-    // Here you would typically navigate to an order confirmation page or clear the cart
   };
   
   if (totalAmount === 0) {
-    return null; // Don't show payment selector if there's no order
+    return null; 
   }
 
   return (
@@ -57,10 +60,10 @@ const PaymentSelector: React.FC<PaymentSelectorProps> = ({ onPaymentSelect, tota
       <CardHeader>
         <CardTitle className="font-headline text-3xl text-primary flex items-center">
             <Landmark className="w-8 h-8 mr-3 text-accent" />
-            Choose Payment Method
+            選擇付款方式
         </CardTitle>
         <CardDescription className="text-lg">
-          Select how you'd like to pay for your order.
+          選擇您希望如何支付訂單。
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -86,14 +89,14 @@ const PaymentSelector: React.FC<PaymentSelectorProps> = ({ onPaymentSelect, tota
             onClick={handlePayment} 
             className="w-full bg-primary text-primary-foreground hover:bg-primary/90 text-lg py-6 group transition-all duration-300 ease-in-out transform hover:scale-105"
             disabled={!selectedMethod || isProcessingPayment}
-            aria-label="Confirm and Pay"
+            aria-label="確認並付款"
         >
           {isProcessingPayment ? (
             <Loader2 className="mr-2 h-6 w-6 animate-spin" />
           ) : (
             <CreditCard className="mr-2 h-6 w-6 group-hover:animate-subtle-pulse" />
           )}
-          {isProcessingPayment ? 'Processing Payment...' : `Confirm & Pay $${totalAmount.toFixed(2)}`}
+          {isProcessingPayment ? '正在處理付款...' : `確認並支付 HK$${totalAmount.toFixed(2)}`}
         </Button>
       </CardFooter>
     </Card>

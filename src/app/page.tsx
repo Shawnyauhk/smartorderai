@@ -30,8 +30,8 @@ export default function HomePage() {
       
       if (!result || !result.orderItems || result.orderItems.length === 0) {
         toast({
-          title: "Order Not Understood",
-          description: "Sorry, I couldn't understand your order. Please try rephrasing or be more specific.",
+          title: "未能理解訂單",
+          description: "抱歉，我們無法理解您的訂單。請嘗試重新描述或說得更具體一些。",
           variant: "destructive",
         });
         setIsProcessingOrder(false);
@@ -65,22 +65,22 @@ export default function HomePage() {
 
       if (itemsNotFound.length > 0) {
          toast({
-          title: "Some Items Not Found",
-          description: `Could not find: ${itemsNotFound.join(', ')}. Please check our menu or try again. Other items have been added.`,
+          title: "部分食品未能找到",
+          description: `未能找到：${itemsNotFound.join('、')}。請檢查我們的餐牌或重試。其他食品已成功加入。`,
           variant: "destructive",
           duration: 7000,
         });
       } else if (currentCartItems.length > 0) {
         toast({
-          title: "Order Parsed!",
-          description: "Your order has been processed. Please review below.",
+          title: "訂單已處理！",
+          description: "您的訂單已成功處理。請於下方核對。",
           variant: "default",
           className: "bg-green-500 text-white border-green-600"
         });
       } else {
          toast({
-          title: "No Valid Items Found",
-          description: "We couldn't find any valid items from your order in our menu.",
+          title: "未找到有效食品",
+          description: "我們在餐牌中找不到您訂單中的任何有效食品。",
           variant: "destructive",
         });
       }
@@ -88,8 +88,8 @@ export default function HomePage() {
     } catch (error) {
       console.error("Error parsing order:", error);
       toast({
-        title: "Processing Error",
-        description: "There was an error processing your order. Please try again.",
+        title: "處理錯誤",
+        description: "處理您的訂單時發生錯誤，請重試。",
         variant: "destructive",
       });
     } finally {
@@ -98,12 +98,7 @@ export default function HomePage() {
   };
 
   const handlePaymentSelection = (paymentMethod: string) => {
-    // In a real app, you'd finalize the order here, e.g., save to DB
-    console.log(`Payment method selected: ${paymentMethod}, Total: $${totalAmount.toFixed(2)}`);
-    // Reset for new order
-    // setParsedOrderItems([]);
-    // setTotalAmount(0);
-    // This would ideally navigate to an order success page or similar
+    console.log(`Payment method selected: ${paymentMethod}, Total: HK$${totalAmount.toFixed(2)}`);
   };
 
   const availableCategories = Array.from(new Set(mockProducts.map(p => p.category)));
@@ -112,12 +107,11 @@ export default function HomePage() {
     <div className="space-y-12">
       <Alert variant="default" className="bg-accent/20 border-accent/50">
         <Info className="h-5 w-5 text-accent" />
-        <AlertTitle className="font-headline text-accent">Welcome to SmartOrder AI!</AlertTitle>
+        <AlertTitle className="font-headline text-accent">歡迎使用智能點餐AI！</AlertTitle>
         <AlertDescription>
-          You can type your order naturally, like "I'd like two classic burgers, one with no onions, and a large coke."
-          Our AI will process it for you. Check our <Link href="/admin/products" className="underline hover:text-primary">full menu</Link> for available items.
+          您可以自然地輸入您的訂單，例如：「我想要兩個經典漢堡，一個不要洋蔥，還有一杯大杯可樂。」我們的AI會為您處理。請查看我們的 <Link href="/admin/products" className="underline hover:text-primary">完整餐牌</Link> 以了解供應的食品。
           <div className="mt-2">
-            <span className="font-semibold">Available Categories:</span> {availableCategories.join(', ')}.
+            <span className="font-semibold">供應類別：</span> {availableCategories.join('、 ')}.
           </div>
         </AlertDescription>
       </Alert>
@@ -134,42 +128,28 @@ export default function HomePage() {
 
       {isProcessingOrder && parsedOrderItems.length === 0 && (
          <div className="text-center py-8">
-            <p className="text-lg text-muted-foreground animate-pulse">Analyzing your order with AI magic...</p>
+            <p className="text-lg text-muted-foreground animate-pulse">AI正在努力為您分析訂單...</p>
          </div>
       )}
       
       {!isProcessingOrder && orderTextSubmittedButNoItemsFound() && (
          <Alert variant="destructive" className="mt-8">
            <AlertCircle className="h-5 w-5" />
-           <AlertTitle className="font-headline">Order Understanding Issue</AlertTitle>
+           <AlertTitle className="font-headline">訂單理解問題</AlertTitle>
            <AlertDescription>
-             We had trouble understanding your order, or the items requested are not on our menu. 
-             Please try rephrasing or check our <Link href="/admin/products" className="underline hover:text-destructive-foreground/80">menu</Link>.
+             我們無法完全理解您的訂單，或您所點的食品不在我們的餐牌上。
+             請嘗試重新描述，或查看我們的 <Link href="/admin/products" className="underline hover:text-destructive-foreground/80">餐牌</Link>。
            </AlertDescription>
          </Alert>
       )}
     </div>
   );
 
-  // Helper function to determine if an order was submitted but no items were found after processing
   function orderTextSubmittedButNoItemsFound() {
-    // This condition can be refined. It checks if an attempt was made (isProcessing is false now)
-    // but no items are in the cart. This assumes handleOrderSubmit was called at least once.
-    // A more robust way might involve another state variable like `orderAttempted`.
-    // For now, this implies that processing finished and the cart is empty.
     return !isProcessingOrder && totalAmount === 0 && parsedOrderItems.length === 0 && userHasAttemptedOrder();
   }
 
   function userHasAttemptedOrder() {
-    // This is a proxy. A better way would be a dedicated state variable `hasAttemptedOrder`.
-    // This relies on `isProcessingOrder` flipping back to false after an attempt.
-    // And a toast has been shown regarding the order processing.
-    // For this simple example, we infer it if processing is done and the cart is empty.
-    // If there was an initial state where isProcessingOrder is false and cart is empty, this would be true.
-    // This needs a better flag. Let's assume if totalAmount is 0 AND processing is done, and cart is empty, 
-    // it implies an attempt that yielded nothing or an error.
-    // This logic is imperfect. For a real app, add a state like `orderAttempted: boolean`.
-    // The toasts already cover most error cases.
-    return true; // Simplified: the main error messages are handled by toasts.
+    return true; 
   }
 }

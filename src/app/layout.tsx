@@ -4,8 +4,8 @@ import { Toaster } from "@/components/ui/toaster";
 import Navbar from '@/components/Navbar';
 
 export const metadata: Metadata = {
-  title: 'SmartOrder AI',
-  description: 'AI-powered restaurant ordering system',
+  title: '智能點餐AI',
+  description: 'AI驅動的餐廳點餐系統',
 };
 
 export default function RootLayout({
@@ -14,7 +14,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="zh-HK">
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -28,7 +28,7 @@ export default function RootLayout({
         </main>
         <Toaster />
         <footer className="text-center p-4 text-sm text-muted-foreground">
-          © {new Date().getFullYear()} SmartOrder AI. All rights reserved.
+          © {new Date().getFullYear()} 智能點餐AI. 版權所有.
         </footer>
       </body>
     </html>

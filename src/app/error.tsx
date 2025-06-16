@@ -1,4 +1,4 @@
-'use client' // Error components must be Client Components
+'use client' 
  
 import { useEffect } from 'react'
 import { Button } from '@/components/ui/button'
@@ -12,31 +12,29 @@ export default function Error({
   reset: () => void
 }) {
   useEffect(() => {
-    // Log the error to an error reporting service
     console.error(error)
   }, [error])
  
   return (
     <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)] text-center p-8">
       <AlertTriangle className="w-16 h-16 text-destructive mb-6" />
-      <h1 className="text-4xl font-headline font-bold text-destructive mb-4">Oops! Something went wrong.</h1>
+      <h1 className="text-4xl font-headline font-bold text-destructive mb-4">哎呀！出現問題。</h1>
       <p className="text-lg text-muted-foreground mb-8 max-w-md">
-        We encountered an unexpected issue. Please try again, or contact support if the problem persists.
+        我們遇到了意外問題。請重試，如果問題持續存在，請聯繫支援。
       </p>
-      <p className="text-sm text-muted-foreground mb-2">Error details (for developers):</p>
+      <p className="text-sm text-muted-foreground mb-2">錯誤詳情 (供開發者參考)：</p>
       <pre className="text-xs bg-muted p-3 rounded-md max-w-full overflow-auto mb-8">
         {error.message}
         {error.digest && `\nDigest: ${error.digest}`}
       </pre>
       <Button
         onClick={
-          // Attempt to recover by trying to re-render the segment
           () => reset()
         }
         size="lg"
         className="bg-primary hover:bg-primary/90 text-primary-foreground"
       >
-        Try again
+        再試一次
       </Button>
     </div>
   )

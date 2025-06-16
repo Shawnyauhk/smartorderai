@@ -23,7 +23,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
               sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
               className="object-cover group-hover:scale-105 transition-transform duration-500 ease-in-out"
               data-ai-hint={product['data-ai-hint'] || 'food item'}
-              priority={product.id === '1' || product.id === '2'} // Example: prioritize first few images
+              priority={product.id === '1' || product.id === '2'}
             />
           </div>
         )}
@@ -35,16 +35,15 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           {product.category}
         </Badge>
         <CardDescription className="text-base text-foreground/80 line-clamp-3">
-          {product.description || 'No description available.'}
+          {product.description || '暫無描述。'}
         </CardDescription>
       </CardContent>
       <CardFooter className="p-6 bg-muted/30">
         <div className="flex items-center justify-between w-full">
           <p className="text-2xl font-bold text-accent flex items-center">
             <DollarSign className="w-6 h-6 mr-1" />
-            {product.price.toFixed(2)}
+            {`HK$${product.price.toFixed(2)}`}
           </p>
-          {/* Add to cart or edit button can go here in future */}
         </div>
       </CardFooter>
     </Card>
