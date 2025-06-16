@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { use, useState, useEffect } from 'react';
 import { mockProducts } from '@/lib/product-data';
 import ProductCard from '@/components/ProductCard';
 import { Separator } from '@/components/ui/separator';
@@ -28,7 +28,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 
 type Props = {
-  params: { category: string };
+  params: Promise<{ category: string }>;
 };
 
 interface SortableProductItemProps {
@@ -67,7 +67,8 @@ function SortableProductItem({ product }: SortableProductItemProps) {
   );
 }
 
-export default function CategoryProductsPage({ params }: Props) {
+export default function CategoryProductsPage({ params: paramsPromise }: Props) {
+  const params = use(paramsPromise);
   const decodedCategory = decodeURIComponent(params.category);
   const [orderedProducts, setOrderedProducts] = useState<Product[]>([]);
 
@@ -128,7 +129,7 @@ export default function CategoryProductsPage({ params }: Props) {
         >
           <SortableContext
             items={orderedProducts.map(p => p.id)}
-            strategy={rectSortingStrategy} // Use rectSortingStrategy for grids
+            strategy={rectSortingStrategy}
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {orderedProducts.map((product) => (
