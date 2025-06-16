@@ -6,12 +6,67 @@ import { mockProducts } from '@/lib/product-data';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { PlusCircle, FolderKanban, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { PlusCircle, FolderKanban, GripVertical } from 'lucide-react';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import type { Product } from '@/types';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
+type CategoryEntry = { id: string; name: string; count: number };
+
+interface SortableCategoryCardProps {
+  categoryItem: CategoryEntry;
+  children: React.ReactNode;
+}
+
+function SortableCategoryCard({ categoryItem, children }: SortableCategoryCardProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: categoryItem.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 10 : undefined,
+    opacity: isDragging ? 0.8 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="relative touch-manipulation">
+      {children}
+      <button
+        {...attributes}
+        {...listeners}
+        className="absolute top-2 right-2 p-1 text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing"
+        aria-label={`拖動排序 ${categoryItem.name}`}
+      >
+        <GripVertical className="h-5 w-5" />
+      </button>
+    </div>
+  );
+}
 
 export default function AdminProductsPage() {
-  type CategoryEntry = { name: string; count: number };
   const [orderedCategories, setOrderedCategories] = useState<CategoryEntry[]>([]);
 
   useEffect(() => {
@@ -23,25 +78,28 @@ export default function AdminProductsPage() {
       return acc;
     }, {} as Record<string, number>);
 
-    const initialCategories = Object.entries(categoriesMap).map(([name, count]) => ({ name, count }));
+    const initialCategories = Object.entries(categoriesMap).map(([name, count]) => ({ id: name, name, count }));
     setOrderedCategories(initialCategories);
   }, []);
 
-  const moveCategory = (index: number, direction: 'up' | 'down') => {
-    setOrderedCategories(prev => {
-      const newCategories = [...prev];
-      const targetIndex = direction === 'up' ? index - 1 : index + 1;
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
-      if (targetIndex < 0 || targetIndex >= newCategories.length) {
-        return newCategories; // Should not happen if buttons are disabled correctly
-      }
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
 
-      const temp = newCategories[index];
-      newCategories[index] = newCategories[targetIndex];
-      newCategories[targetIndex] = temp;
-      return newCategories;
-    });
-  };
+    if (over && active.id !== over.id) {
+      setOrderedCategories((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id);
+        const newIndex = items.findIndex((item) => item.id === over.id);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
+  }
 
   return (
     <div className="space-y-8">
@@ -52,7 +110,7 @@ export default function AdminProductsPage() {
             產品系列
           </h1>
           <p className="text-lg text-muted-foreground mt-1">
-            選擇一個系列以查看詳細產品。您可以點擊箭頭調整系列順序。
+            選擇一個系列以查看詳細產品。您可以拖動卡片調整系列順序。
           </p>
         </div>
         <Button variant="default" size="lg" asChild className="shadow-md hover:shadow-lg transition-shadow transform hover:scale-105">
@@ -66,44 +124,33 @@ export default function AdminProductsPage() {
       <Separator />
 
       {orderedCategories.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {orderedCategories.map(({ name: category, count }, index) => (
-            <Card key={category} className="h-full flex flex-col justify-between hover:shadow-lg transition-shadow duration-300 ease-in-out transform hover:-translate-y-1">
-              <Link href={`/admin/products/${encodeURIComponent(category)}`} legacyBehavior>
-                <a className="block hover:no-underline flex-grow">
-                  <CardHeader>
-                    <CardTitle className="text-2xl font-headline text-primary">{category}</CardTitle>
-                    <CardDescription>{count} 種產品</CardDescription>
-                  </CardHeader>
-                </a>
-              </Link>
-              <CardFooter className="p-3 border-t mt-auto">
-                <div className="flex justify-end space-x-2 w-full">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => moveCategory(index, 'up')}
-                    disabled={index === 0}
-                    aria-label={`將 ${category} 上移`}
-                    className="h-8 w-8"
-                  >
-                    <ArrowUpCircle className="h-5 w-5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => moveCategory(index, 'down')}
-                    disabled={index === orderedCategories.length - 1}
-                    aria-label={`將 ${category} 下移`}
-                    className="h-8 w-8"
-                  >
-                    <ArrowDownCircle className="h-5 w-5" />
-                  </Button>
-                </div>
-              </CardFooter>
-            </Card>
-          ))}
-        </div>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={orderedCategories.map(c => c.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {orderedCategories.map((categoryItem) => (
+                <SortableCategoryCard key={categoryItem.id} categoryItem={categoryItem}>
+                  <Card className="h-full flex flex-col justify-between hover:shadow-lg transition-shadow duration-300 ease-in-out transform hover:-translate-y-1">
+                    <Link href={`/admin/products/${encodeURIComponent(categoryItem.name)}`} legacyBehavior>
+                      <a className="block hover:no-underline flex-grow p-1">
+                        <CardHeader>
+                          <CardTitle className="text-2xl font-headline text-primary">{categoryItem.name}</CardTitle>
+                          <CardDescription>{categoryItem.count} 種產品</CardDescription>
+                        </CardHeader>
+                      </a>
+                    </Link>
+                  </Card>
+                </SortableCategoryCard>
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
       ) : (
         <div className="text-center py-12">
           <p className="text-xl text-muted-foreground">未找到任何產品系列。</p>

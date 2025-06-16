@@ -7,16 +7,65 @@ import ProductCard from '@/components/ProductCard';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { ArrowLeftCircle, ListOrdered, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
-import type { Metadata } from 'next'; // Removed ResolvingMetadata as it's not used for client components for dynamic titles
+import { ArrowLeftCircle, ListOrdered, GripVertical } from 'lucide-react';
 import type { Product } from '@/types';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  rectSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 type Props = {
   params: { category: string };
 };
 
-// Metadata generation needs to be handled differently for client components or use a server component wrapper
-// For simplicity, dynamic title will be set via document.title in useEffect
+interface SortableProductItemProps {
+  product: Product;
+}
+
+function SortableProductItem({ product }: SortableProductItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: product.id });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 10 : undefined,
+    opacity: isDragging ? 0.8 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="relative touch-manipulation group/productcard">
+      <ProductCard product={product} />
+      <button
+        {...attributes}
+        {...listeners}
+        className="absolute top-2 right-2 p-1 text-muted-foreground bg-card/70 rounded-full hover:text-foreground cursor-grab active:cursor-grabbing opacity-0 group-hover/productcard:opacity-100 transition-opacity"
+        aria-label={`拖動排序 ${product.name}`}
+      >
+        <GripVertical className="h-5 w-5" />
+      </button>
+    </div>
+  );
+}
 
 export default function CategoryProductsPage({ params }: Props) {
   const decodedCategory = decodeURIComponent(params.category);
@@ -30,21 +79,24 @@ export default function CategoryProductsPage({ params }: Props) {
     document.title = `${decodedCategory} - 產品列表 - 智能點餐AI`;
   }, [decodedCategory]);
 
-  const moveProduct = (index: number, direction: 'up' | 'down') => {
-    setOrderedProducts(prev => {
-      const newProducts = [...prev];
-      const targetIndex = direction === 'up' ? index - 1 : index + 1;
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
-      if (targetIndex < 0 || targetIndex >= newProducts.length) {
-        return newProducts;
-      }
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
 
-      const temp = newProducts[index];
-      newProducts[index] = newProducts[targetIndex];
-      newProducts[targetIndex] = temp;
-      return newProducts;
-    });
-  };
+    if (over && active.id !== over.id) {
+      setOrderedProducts((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id);
+        const newIndex = items.findIndex((item) => item.id === over.id);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
+  }
   
   return (
     <div className="space-y-8">
@@ -61,7 +113,7 @@ export default function CategoryProductsPage({ params }: Props) {
             {decodedCategory}
           </h1>
           <p className="text-lg text-muted-foreground mt-1">
-            瀏覽 {decodedCategory} 系列中的所有產品。您可以點擊箭頭調整產品順序。
+            瀏覽 {decodedCategory} 系列中的所有產品。您可以拖動卡片調整產品順序。
           </p>
         </div>
       </div>
@@ -69,19 +121,22 @@ export default function CategoryProductsPage({ params }: Props) {
       <Separator />
 
       {orderedProducts.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {orderedProducts.map((product, index) => (
-            <ProductCard 
-              key={product.id} 
-              product={product}
-              showSortButtons={true}
-              isFirst={index === 0}
-              isLast={index === orderedProducts.length - 1}
-              onMoveUp={() => moveProduct(index, 'up')}
-              onMoveDown={() => moveProduct(index, 'down')}
-            />
-          ))}
-        </div>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={orderedProducts.map(p => p.id)}
+            strategy={rectSortingStrategy} // Use rectSortingStrategy for grids
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {orderedProducts.map((product) => (
+                <SortableProductItem key={product.id} product={product} />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
       ) : (
         <div className="text-center py-12">
           <p className="text-xl text-muted-foreground">在此系列中未找到任何產品。</p>

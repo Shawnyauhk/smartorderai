@@ -5,28 +5,30 @@ import type { Product } from '@/types';
 import Image from 'next/image';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { DollarSign, Tag, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
+import { DollarSign, Tag } from 'lucide-react';
 
 interface ProductCardProps {
   product: Product;
-  showSortButtons?: boolean;
-  isFirst?: boolean;
-  isLast?: boolean;
-  onMoveUp?: () => void;
-  onMoveDown?: () => void;
+  // Drag and drop related props will be passed implicitly by the SortableItem wrapper or parent
+  // style?: React.CSSProperties; 
+  // attributes?: any;
+  // listeners?: any;
 }
 
 const ProductCard: React.FC<ProductCardProps> = ({ 
-  product, 
-  showSortButtons = false, 
-  isFirst, 
-  isLast, 
-  onMoveUp, 
-  onMoveDown 
+  product,
+  // style, 
+  // attributes, 
+  // listeners 
 }) => {
   return (
-    <Card className="flex flex-col h-full overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out transform hover:-translate-y-1">
+    <Card 
+      className="flex flex-col h-full overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out transform hover:-translate-y-1"
+      // style={style} // Apply transform/transition styles for dnd-kit if passed
+    >
+      {/* <button {...attributes} {...listeners} className="absolute top-2 right-2 z-10 p-1 bg-background/50 rounded-full cursor-grab active:cursor-grabbing">
+        <GripVertical className="w-5 h-5 text-muted-foreground" />
+      </button> */}
       <CardHeader className="p-0">
         {product.imageUrl && (
           <div className="aspect-[3/2] w-full relative overflow-hidden">
@@ -37,7 +39,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
               sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
               className="object-cover group-hover:scale-105 transition-transform duration-500 ease-in-out"
               data-ai-hint={product['data-ai-hint'] || 'food item'}
-              priority={product.id === '1' || product.id === '2'} // Example priority, adjust as needed
+              priority={product.id === '1' || product.id === '2'} 
             />
           </div>
         )}
@@ -59,30 +61,6 @@ const ProductCard: React.FC<ProductCardProps> = ({
             {`HK$${product.price.toFixed(2)}`}
           </p>
         </div>
-        {showSortButtons && (
-          <div className="flex justify-end space-x-2 w-full border-t pt-2 mt-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onMoveUp}
-              disabled={isFirst}
-              aria-label={`將 ${product.name} 上移`}
-              className="h-8 w-8"
-            >
-              <ArrowUpCircle className="h-5 w-5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onMoveDown}
-              disabled={isLast}
-              aria-label={`將 ${product.name} 下移`}
-              className="h-8 w-8"
-            >
-              <ArrowDownCircle className="h-5 w-5" />
-            </Button>
-          </div>
-        )}
       </CardFooter>
     </Card>
   );
