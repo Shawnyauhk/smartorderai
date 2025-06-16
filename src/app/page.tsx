@@ -151,15 +151,6 @@ export default function HomePage() {
 
   return (
     <div className="space-y-12">
-      <Alert variant="default" className="bg-accent/20 border-accent/50">
-        <Info className="h-5 w-5 text-accent" />
-        <AlertTitle className="font-headline text-accent">歡迎使用智能點餐AI！</AlertTitle>
-        <AlertDescription>
-          您可以自然地輸入您的訂單，例如：「我想要兩個經典漢堡，一個不要洋蔥，還有一杯大杯可樂。」我們的AI會為您處理。
-          或者，您也可以在下方按產品系列瀏覽並手動加入餐點。
-        </AlertDescription>
-      </Alert>
-
       <OrderForm onOrderSubmit={handleOrderSubmit} isProcessing={isProcessingOrder} />
 
       <Separator />
