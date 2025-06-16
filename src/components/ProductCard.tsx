@@ -5,30 +5,22 @@ import type { Product } from '@/types';
 import Image from 'next/image';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { DollarSign, Tag } from 'lucide-react';
+import { DollarSign, Tag, PlusCircle } from 'lucide-react';
+import { Button } from './ui/button';
 
 interface ProductCardProps {
   product: Product;
-  // Drag and drop related props will be passed implicitly by the SortableItem wrapper or parent
-  // style?: React.CSSProperties; 
-  // attributes?: any;
-  // listeners?: any;
+  onAddToCart?: (product: Product) => void;
 }
 
 const ProductCard: React.FC<ProductCardProps> = ({ 
   product,
-  // style, 
-  // attributes, 
-  // listeners 
+  onAddToCart,
 }) => {
   return (
     <Card 
       className="flex flex-col h-full overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out transform hover:-translate-y-1"
-      // style={style} // Apply transform/transition styles for dnd-kit if passed
     >
-      {/* <button {...attributes} {...listeners} className="absolute top-2 right-2 z-10 p-1 bg-background/50 rounded-full cursor-grab active:cursor-grabbing">
-        <GripVertical className="w-5 h-5 text-muted-foreground" />
-      </button> */}
       <CardHeader className="p-0">
         {product.imageUrl && (
           <div className="aspect-[3/2] w-full relative overflow-hidden">
@@ -61,6 +53,18 @@ const ProductCard: React.FC<ProductCardProps> = ({
             {`HK$${product.price.toFixed(2)}`}
           </p>
         </div>
+        {onAddToCart && (
+          <Button 
+            onClick={() => onAddToCart(product)} 
+            variant="outline" 
+            size="sm" 
+            className="w-full mt-1 border-primary text-primary hover:bg-primary/10 hover:text-primary"
+            aria-label={`將 ${product.name} 加入購物車`}
+          >
+            <PlusCircle className="mr-2 h-4 w-4" />
+            加入購物車
+          </Button>
+        )}
       </CardFooter>
     </Card>
   );
