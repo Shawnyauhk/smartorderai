@@ -2,59 +2,59 @@
 import type { Product } from '@/types';
 
 export const mockProducts: Product[] = [
-  { 
-    id: '1', 
-    name: '經典漢堡', 
-    price: 12.99, 
-    category: '漢堡', 
-    imageUrl: 'https://placehold.co/300x200.png', 
+  {
+    id: '1',
+    name: '經典漢堡',
+    price: 12.99,
+    category: '漢堡',
+    imageUrl: 'https://placehold.co/300x200.png',
     "data-ai-hint": 'burger food',
-    description: '多汁牛肉餅配生菜、番茄及秘製醬汁。' 
+    description: '多汁牛肉餅配生菜、番茄及秘製醬汁。'
   },
-  { 
-    id: '2', 
-    name: '芝士漢堡', 
-    price: 13.99, 
-    category: '漢堡', 
-    imageUrl: 'https://placehold.co/300x200.png', 
+  {
+    id: '2',
+    name: '芝士漢堡',
+    price: 13.99,
+    category: '漢堡',
+    imageUrl: 'https://placehold.co/300x200.png',
     "data-ai-hint": 'cheeseburger food',
-    description: '經典漢堡配車打芝士。' 
+    description: '經典漢堡配車打芝士。'
   },
-  { 
-    id: '3', 
-    name: '薯條', 
-    price: 4.50, 
-    category: '小食', 
-    imageUrl: 'https://placehold.co/300x200.png', 
+  {
+    id: '3',
+    name: '薯條',
+    price: 4.50,
+    category: '小食',
+    imageUrl: 'https://placehold.co/300x200.png',
     "data-ai-hint": 'fries food',
-    description: '香脆金黃炸薯條。' 
+    description: '香脆金黃炸薯條。'
   },
-  { 
-    id: '4', 
-    name: '可樂', 
-    price: 2.50, 
-    category: '飲品', 
-    imageUrl: 'https://placehold.co/300x200.png', 
+  {
+    id: '4',
+    name: '可樂',
+    price: 2.50,
+    category: '飲品',
+    imageUrl: 'https://placehold.co/300x200.png',
     "data-ai-hint": 'soda drink',
-    description: '冰鎮可口可樂。' 
+    description: '冰鎮可口可樂。'
   },
-  { 
-    id: '5', 
-    name: '瑪格麗特薄餅', 
-    price: 15.00, 
-    category: '薄餅', 
-    imageUrl: 'https://placehold.co/300x200.png', 
+  {
+    id: '5',
+    name: '瑪格麗特薄餅',
+    price: 15.00,
+    category: '薄餅',
+    imageUrl: 'https://placehold.co/300x200.png',
     "data-ai-hint": 'pizza food',
-    description: '經典薄餅配番茄、水牛芝士及羅勒。' 
+    description: '經典薄餅配番茄、水牛芝士及羅勒。'
   },
-  { 
-    id: '6', 
-    name: '凱撒沙律', 
-    price: 10.50, 
-    category: '沙律', 
-    imageUrl: 'https://placehold.co/300x200.png', 
+  {
+    id: '6',
+    name: '凱撒沙律',
+    price: 10.50,
+    category: '沙律',
+    imageUrl: 'https://placehold.co/300x200.png',
     "data-ai-hint": 'salad food',
-    description: '新鮮羅馬生菜配凱撒醬、麵包粒及巴馬臣芝士。' 
+    description: '新鮮羅馬生菜配凱撒醬、麵包粒及巴馬臣芝士。'
   },
   {
     id: '7',
@@ -82,10 +82,20 @@ export const mockProducts: Product[] = [
     imageUrl: 'https://placehold.co/300x200.png',
     "data-ai-hint": 'iced tea',
     description: '清爽鮮泡冰鎮檸檬茶。'
+  },
+  {
+    id: '10',
+    name: '公司三文治',
+    price: 35.00,
+    category: '三文治',
+    imageUrl: 'https://placehold.co/300x200.png',
+    "data-ai-hint": 'club sandwich',
+    description: '經典三層三文治，包含煙肉、雞蛋、生菜及番茄。'
   }
 ];
 
 export const findProductByName = (name: string): Product | undefined => {
-  const searchTerm = name.toLowerCase();
-  return mockProducts.find(p => p.name.toLowerCase() === searchTerm);
+  // Assumes the AI will return the exact product name as defined in mockProducts.
+  // This is more reliable for Chinese names where case-insensitivity is not standard.
+  return mockProducts.find(p => p.name === name);
 };
