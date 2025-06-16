@@ -157,7 +157,6 @@ export default function HomePage() {
         <AlertDescription>
           您可以自然地輸入您的訂單，例如：「我想要兩個經典漢堡，一個不要洋蔥，還有一杯大杯可樂。」我們的AI會為您處理。
           或者，您也可以在下方按產品系列瀏覽並手動加入餐點。
-          請查看我們的 <Link href="/admin/products" className="underline hover:text-primary">完整餐牌</Link> 以了解供應的食品。
         </AlertDescription>
       </Alert>
 
@@ -190,7 +189,7 @@ export default function HomePage() {
            <AlertTitle className="font-headline">訂單為空或未找到產品</AlertTitle>
            <AlertDescription>
              我們無法找到您訂單中的產品，或購物車目前是空的。
-             請嘗試重新描述您的AI訂單，或使用手動選擇餐點功能，或查看我們的 <Link href="/admin/products" className="underline hover:text-destructive-foreground/80">餐牌</Link>。
+             請嘗試重新描述您的AI訂單，或使用手動選擇餐點功能。
            </AlertDescription>
          </Alert>
       )}
