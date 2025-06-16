@@ -1,86 +1,87 @@
+
 import type { Product } from '@/types';
 
 export const mockProducts: Product[] = [
   { 
     id: '1', 
-    name: 'Classic Burger', 
+    name: '經典漢堡', 
     price: 12.99, 
-    category: 'Burgers', 
+    category: '漢堡', 
     imageUrl: 'https://placehold.co/300x200.png', 
     "data-ai-hint": 'burger food',
     description: '多汁牛肉餅配生菜、番茄及秘製醬汁。' 
   },
   { 
     id: '2', 
-    name: 'Cheese Burger', 
+    name: '芝士漢堡', 
     price: 13.99, 
-    category: 'Burgers', 
+    category: '漢堡', 
     imageUrl: 'https://placehold.co/300x200.png', 
     "data-ai-hint": 'cheeseburger food',
     description: '經典漢堡配車打芝士。' 
   },
   { 
     id: '3', 
-    name: 'Fries', 
+    name: '薯條', 
     price: 4.50, 
-    category: 'Sides', 
+    category: '小食', 
     imageUrl: 'https://placehold.co/300x200.png', 
     "data-ai-hint": 'fries food',
     description: '香脆金黃炸薯條。' 
   },
   { 
     id: '4', 
-    name: 'Coke', 
+    name: '可樂', 
     price: 2.50, 
-    category: 'Drinks', 
+    category: '飲品', 
     imageUrl: 'https://placehold.co/300x200.png', 
     "data-ai-hint": 'soda drink',
     description: '冰鎮可口可樂。' 
   },
   { 
     id: '5', 
-    name: 'Pizza Margherita', 
+    name: '瑪格麗特薄餅', 
     price: 15.00, 
-    category: 'Pizza', 
+    category: '薄餅', 
     imageUrl: 'https://placehold.co/300x200.png', 
     "data-ai-hint": 'pizza food',
     description: '經典薄餅配番茄、水牛芝士及羅勒。' 
   },
   { 
     id: '6', 
-    name: 'Caesar Salad', 
+    name: '凱撒沙律', 
     price: 10.50, 
-    category: 'Salads', 
+    category: '沙律', 
     imageUrl: 'https://placehold.co/300x200.png', 
     "data-ai-hint": 'salad food',
     description: '新鮮羅馬生菜配凱撒醬、麵包粒及巴馬臣芝士。' 
   },
   {
     id: '7',
-    name: 'Spaghetti Carbonara',
+    name: '卡邦尼意粉',
     price: 16.50,
-    category: 'Pasta',
+    category: '意粉',
     imageUrl: 'https://placehold.co/300x200.png',
     "data-ai-hint": 'pasta dish',
     description: '香滑卡邦尼意粉配煙肉、蛋黃及羊奶芝士。'
   },
   {
     id: '8',
-    name: 'Chocolate Lava Cake',
+    name: '朱古力心太軟',
     price: 8.00,
-    category: 'Desserts',
+    category: '甜品',
     imageUrl: 'https://placehold.co/300x200.png',
     "data-ai-hint": 'chocolate cake',
     description: '暖心朱古力熔岩蛋糕配雲呢拿雪糕。'
   },
   {
     id: '9',
-    name: 'Iced Tea',
+    name: '凍檸檬茶',
     price: 3.00,
-    category: 'Drinks',
+    category: '飲品',
     imageUrl: 'https://placehold.co/300x200.png',
     "data-ai-hint": 'iced tea',
-    description: '清爽鮮泡冰茶。'
+    description: '清爽鮮泡冰鎮檸檬茶。'
   }
 ];
 
