@@ -258,7 +258,7 @@ export default function HomePage() {
                 return (
                   <div key={index} className="p-3 border rounded-md border-destructive bg-destructive/10">
                     <p className="font-semibold text-destructive-foreground">
-                      AI 偵測到您提及的「{item.item}」(您要求 {item.quantity}份) 比較模糊，可能指以下其中一個產品：
+                      關於「{item.item}」(您要求 {item.quantity}份)，AI 認為可能是以下其中之一：
                     </p>
                     <ul className="list-disc list-inside text-sm text-destructive-foreground/90 pl-4 mt-2 space-y-1">
                       {item.alternatives!.map(alt => <li key={alt}>{alt}</li>)}
