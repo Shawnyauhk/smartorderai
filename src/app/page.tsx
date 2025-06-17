@@ -12,7 +12,7 @@ import PaymentSelector from '@/components/PaymentSelector';
 import ManualOrderSection from '@/components/ManualOrderSection';
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from '@/components/ui/separator';
-import { AlertCircle, Check, X, ShoppingCart, Edit3 } from 'lucide-react';
+import { AlertCircle, Check, X, ShoppingCart, Edit3, CheckCircle } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -65,6 +65,80 @@ export default function HomePage() {
     }
   };
 
+  const handleAddSpecificAiSuggestion = (aiItemToAdd: ParsedAiOrderItem) => {
+    const product = findProductByName(aiItemToAdd.item);
+    if (product) {
+      setParsedOrderItems(prevItems => {
+          let currentCartItems = [...prevItems];
+          const existingItemIndex = currentCartItems.findIndex(
+            (cartItem) => cartItem.productId === product.id && cartItem.specialRequests === (aiItemToAdd.specialRequests || undefined)
+          );
+  
+          if (existingItemIndex > -1) {
+            currentCartItems[existingItemIndex].quantity += aiItemToAdd.quantity;
+          } else {
+            currentCartItems.push({
+              productId: product.id,
+              name: product.name,
+              quantity: aiItemToAdd.quantity,
+              unitPrice: product.price,
+              specialRequests: aiItemToAdd.specialRequests,
+              imageUrl: product.imageUrl,
+              "data-ai-hint": product["data-ai-hint"],
+            });
+          }
+          setTotalAmount(recalculateTotal(currentCartItems));
+          return currentCartItems;
+      });
+  
+      toast({
+        title: "已加入購物車",
+        description: `${product.name} (x${aiItemToAdd.quantity}) 已成功加入您的訂單。`,
+        variant: "default",
+        className: "bg-green-500 text-white border-green-600"
+      });
+  
+      let itemRemoved = false;
+      const newAiSuggestedItems = aiSuggestedItems.filter(suggestion => {
+          if (!itemRemoved && suggestion.item === aiItemToAdd.item && suggestion.quantity === aiItemToAdd.quantity && suggestion.specialRequests === aiItemToAdd.specialRequests) {
+              itemRemoved = true;
+              return false; 
+          }
+          return true; 
+      });
+  
+      if (newAiSuggestedItems.length === 0) {
+        setShowAiConfirmation(false);
+        setAiSuggestedItems([]);
+      } else {
+        setAiSuggestedItems(newAiSuggestedItems);
+      }
+  
+    } else {
+      toast({
+        title: "未能加入餐點",
+        description: `抱歉，未能找到餐點 "${aiItemToAdd.item}"。`,
+        variant: "destructive",
+      });
+      
+      let itemRemovedErrorCase = false;
+      const newAiSuggestedItemsErrorCase = aiSuggestedItems.filter(suggestion => {
+        if(!itemRemovedErrorCase && suggestion.item === aiItemToAdd.item && suggestion.quantity === aiItemToAdd.quantity && suggestion.specialRequests === aiItemToAdd.specialRequests) {
+            itemRemovedErrorCase = true;
+            return false;
+        }
+        return true;
+      });
+
+      if (newAiSuggestedItemsErrorCase.length === 0) {
+        setShowAiConfirmation(false);
+        setAiSuggestedItems([]);
+      } else {
+        setAiSuggestedItems(newAiSuggestedItemsErrorCase);
+      }
+    }
+  };
+
   const handleConfirmAiSuggestions = () => {
     let currentCartItems = [...parsedOrderItems];
     let newItemsAddedCount = 0;
@@ -74,7 +148,7 @@ export default function HomePage() {
     aiSuggestedItems.forEach((aiItem) => {
       if (aiItem.isAmbiguous && aiItem.alternatives && aiItem.alternatives.length > 0) {
         const alternativesText = aiItem.alternatives.join(' 或 ');
-        ambiguousItemsInfo.push(`對於 "${aiItem.item}" (您要求 ${aiItem.quantity}份)，AI 認為可能是：${alternativesText}。`);
+        ambiguousItemsInfo.push(`關於「${aiItem.item}」(您要求 ${aiItem.quantity}份)，AI 認為可能是以下其中之一：${alternativesText}。`);
         return; 
       }
 
@@ -244,19 +318,19 @@ export default function HomePage() {
               AI 為您建議的訂單
             </CardTitle>
             <CardDescription>
-              這是AI根據您的描述理解的內容。請確認是否正確，或取消以重新輸入。
+              這是AI根據您的描述理解的內容。您可以點擊單個項目加入購物車，或確認加入全部建議。
               對於有歧義的項目，AI會列出可能的選項，請您在確認前先作判斷。
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-2">
             {aiSuggestedItems.map((item, index) => {
               const isItemAmbiguous = item.isAmbiguous && item.alternatives && item.alternatives.length > 0;
               const sr = item.specialRequests;
-              const showSpecialRequestsLine = sr && sr.trim() !== '' && sr.toLowerCase() !== 'string' && !sr.startsWith('N/A (This key was typoed');
+              const showSpecialRequestsLine = sr && sr.trim() !== '' && sr.toLowerCase() !== 'string' && !sr.startsWith('N/A (This key was typoed') && !sr.startsWith('string, not applicable here, this should be omitted or null or empty string if no special requests');
 
               if (isItemAmbiguous) {
                 return (
-                  <div key={index} className="p-3 border rounded-md border-destructive bg-destructive/10">
+                  <div key={`${item.item}-${index}-ambiguous`} className="p-3 border rounded-md border-destructive bg-destructive/10">
                     <p className="font-semibold text-destructive-foreground">
                       關於「{item.item}」(您要求 {item.quantity}份)，AI 認為可能是以下其中之一：
                     </p>
@@ -270,17 +344,26 @@ export default function HomePage() {
                 );
               } else {
                 return (
-                  <div key={index} className={`p-3 border rounded-md bg-muted/50`}>
-                    <p className="font-semibold text-foreground">{item.item} <span className="text-sm text-muted-foreground">(數量: {item.quantity})</span></p>
-                    {showSpecialRequestsLine && (
-                      <p className="text-xs text-primary">特別要求: {item.specialRequests}</p>
-                    )}
-                  </div>
+                  <Button
+                    key={`${item.item}-${index}-suggestion`}
+                    variant="outline"
+                    onClick={() => handleAddSpecificAiSuggestion(item)}
+                    className="w-full justify-start text-left p-3 h-auto border rounded-md bg-muted/30 hover:bg-muted/70 focus:ring-2 focus:ring-primary transition-all group"
+                    aria-label={`選擇並加入 ${item.item}`}
+                  >
+                    <div className="flex-grow">
+                      <p className="font-semibold text-foreground group-hover:text-primary">{item.item} <span className="text-sm text-muted-foreground">(數量: {item.quantity})</span></p>
+                      {showSpecialRequestsLine && (
+                        <p className="text-xs text-primary mt-1">特別要求: {item.specialRequests}</p>
+                      )}
+                    </div>
+                    <CheckCircle className="h-5 w-5 text-green-500 opacity-0 group-hover:opacity-100 transition-opacity ml-4" />
+                  </Button>
                 );
               }
             })}
           </CardContent>
-          <CardFooter className="flex flex-col sm:flex-row justify-end gap-3">
+          <CardFooter className="flex flex-col sm:flex-row justify-end gap-3 pt-6">
             <Button variant="outline" onClick={handleCancelAiSuggestions} className="w-full sm:w-auto">
               <X className="mr-2 h-4 w-4" />
               取消並重新輸入
@@ -325,3 +408,4 @@ export default function HomePage() {
     </div>
   );
 }
+
