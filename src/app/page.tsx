@@ -386,7 +386,7 @@ export default function HomePage() {
           onClick={() => setIsManualOrderDialogOpen(true)}
           variant="outline" 
           size="lg"
-          className="border-primary text-primary hover:bg-primary/10 hover:text-primary shadow-md hover:shadow-lg transition-all duration-300 ease-in-out transform hover:scale-105"
+          className="border-primary text-primary hover:bg-primary/10 hover:text-primary shadow-md hover:shadow-lg transition-all duration-300 ease-in-out transform hover:scale-105 text-lg py-3"
         >
           <LayoutGrid className="mr-2 h-5 w-5" />
           手動選擇餐點
