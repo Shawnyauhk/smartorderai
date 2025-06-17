@@ -1,6 +1,5 @@
 
 'use server';
-
 /**
  * @fileOverview Parses voice orders into structured data.
  *
@@ -57,13 +56,13 @@ The restaurant offers items in the following general categories (use these as co
 
 When parsing the order:
 
-0.  **ULTRA-CRITICAL RULE FOR \`specialRequests\` FIELD**: If there are NO special requests for an item, the \`specialRequests\` field in your JSON output for that item **MUST be omitted entirely**. Do not include it with \`null\`, an empty string, or ANY placeholder text like "None", "N/A", "string", or any descriptive sentences explaining this rule (e.g., DO NOT output "string, not applicable here, this should be omitted or null or empty string if no special requests..."). Just OMIT the key entirely if no special requests exist. This is the absolute most important rule for this field and failure to comply will result in incorrect system behavior.
+0.  **ULTRA-CRITICAL RULE FOR \`specialRequests\` FIELD**: If there are NO special requests for an item, the \`specialRequests\` field in your JSON output for that item **MUST be omitted entirely**. Do not include it with \`null\`, an empty string, or ANY placeholder text like "None", "N/A", "string", "N/A (no special requests detected, should be empty or omitted.)", "None, should be empty or omitted.)", or "string, not applicable here, this should be omitted or null or empty string if no special requests, following the guide strictly, do not output string here. Should be omitted or null or empty string ONLY, and this is the most important rule to follow, same for other items in other examples, do not add explanation here or in other examples.". Just OMIT the key entirely if no special requests exist. This is the absolute most important rule for this field and failure to comply will result in incorrect system behavior.
 
 1.  **Identify Menu Items**:
     *   Determine the specific food or drink items requested. Use common, recognizable names for items, exactly as they would appear on a detailed menu. For example, if the menu has "仙草二號（仙草，地瓜圓，芋圓，黑糖粉條，珍珠）", use this full name.
     *   Handle abbreviations, common nicknames (e.g., "雞記" for "雞蛋仔", "檸茶" for "檸檬茶"), and slight misspellings.
     *   If a user specifies a partial name with a number (e.g., '仙草2', '豆花1', or '仙草二號'), and a *unique* product in the menu context matches this (e.g., '仙草二號（仙草，地瓜圓，芋圓，黑糖粉條，珍珠）'), you **MUST** identify that specific product (quantity 1 unless specified otherwise, like "仙草二號三碗"). In this case, \`isAmbiguous\` should be \`false\` or omitted.
-    *   If the user mentions a variation (e.g., "large fries", "熱奶茶"), capture that as part of the item name if it's a distinct menu item (e.g., "大薯條", "熱奶茶") or as a special request if appropriate (e.g., item: "奶茶", specialRequests: "熱"). Favor exact, common menu item names.
+    *   If the user input is primarily a number that could refer to a numbered series of items (e.g., "三號", "2號", "五號"), and multiple distinct products in the menu context incorporate this number (e.g., menu has '仙草三號（仙草，地瓜圓，芋圓，珍珠，椰果）' and '豆花三號'), you **MUST** identify ALL such distinct products. Each identified product should be a separate entry in the \`orderItems\` array with its full name. For example, if the user says "三號", and both "仙草三號（仙草，地瓜圓，芋圓，珍珠，椰果）" and "豆花三號" are on the menu, your output should include two separate items: one for "仙草三號（仙草，地瓜圓，芋圓，珍珠，椰果）" (quantity 1) and one for "豆花三號" (quantity 1), unless quantities are otherwise specified. These items should NOT be marked as ambiguous; instead, list them as individual concrete items.
 
 2.  **Determine Quantities**:
     *   Convert all quantity mentions to Arabic numerals.
