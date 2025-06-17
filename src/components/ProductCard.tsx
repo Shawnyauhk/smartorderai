@@ -23,7 +23,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
     >
       <CardHeader className="p-0">
         {product.imageUrl && (
-          <div className="aspect-[3/2] w-full relative overflow-hidden">
+          <div className="aspect-[4/3] w-full relative overflow-hidden">
             <Image
               src={product.imageUrl}
               alt={product.name}
@@ -36,20 +36,20 @@ const ProductCard: React.FC<ProductCardProps> = ({
           </div>
         )}
       </CardHeader>
-      <CardContent className="p-6 flex-grow">
-        <CardTitle className="text-2xl font-headline mb-2 text-primary">{product.name}</CardTitle>
-        <Badge variant="secondary" className="mb-3 text-sm">
+      <CardContent className="p-4 flex-grow">
+        <CardTitle className="text-2xl font-headline mb-1 text-primary">{product.name}</CardTitle>
+        <Badge variant="secondary" className="mb-2 text-sm">
           <Tag className="w-4 h-4 mr-2" />
           {product.category}
         </Badge>
-        <CardDescription className="text-base text-foreground/80 line-clamp-3">
+        <CardDescription className="text-sm text-foreground/80 line-clamp-3">
           {product.description || '暫無描述。'}
         </CardDescription>
       </CardContent>
-      <CardFooter className="p-4 bg-muted/30 flex flex-col items-stretch gap-2">
+      <CardFooter className="p-3 bg-muted/30 flex flex-col items-stretch gap-2">
         <div className="flex items-center justify-between w-full">
-          <p className="text-2xl font-bold text-accent flex items-center">
-            <DollarSign className="w-6 h-6 mr-1" />
+          <p className="text-xl font-bold text-accent flex items-center">
+            <DollarSign className="w-5 h-5 mr-1" />
             {`HK$${product.price.toFixed(2)}`}
           </p>
         </div>
@@ -71,3 +71,4 @@ const ProductCard: React.FC<ProductCardProps> = ({
 };
 
 export default ProductCard;
+
