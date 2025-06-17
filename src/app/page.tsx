@@ -386,9 +386,9 @@ export default function HomePage() {
           onClick={() => setIsManualOrderDialogOpen(true)}
           variant="outline" 
           size="lg"
-          className="border-primary text-primary hover:bg-primary/10 hover:text-primary shadow-md hover:shadow-lg transition-all duration-300 ease-in-out transform hover:scale-105 text-lg py-3"
+          className="border-primary text-primary hover:bg-primary/10 hover:text-primary shadow-md hover:shadow-lg transition-all duration-300 ease-in-out transform hover:scale-105 text-xl py-4"
         >
-          <LayoutGrid className="mr-2 h-5 w-5" />
+          <LayoutGrid className="mr-2 h-6 w-6" />
           手動選擇餐點
         </Button>
       </div>
@@ -443,3 +443,5 @@ export default function HomePage() {
     </div>
   );
 }
+
+    
