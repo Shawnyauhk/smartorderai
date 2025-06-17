@@ -17,11 +17,11 @@ const ParseOrderInputSchema = z.object({
 export type ParseOrderInput = z.infer<typeof ParseOrderInputSchema>;
 
 const ParsedOrderItemSchema = z.object({
-  item: z.string().describe('The name of the menu item. If the user\'s request is ambiguous (e.g., "大滿貫" which could be "仙草大滿貫" or "豆花大滿貫", or "3號" which could be "仙草三號" or "豆花三號"), this field should be the ambiguous term itself as stated by the user (e.g., "大滿貫" or "3號"). Otherwise, it should be the common, recognizable name, ideally matching what might appear on a menu, including specific numbered versions like "仙草二號（仙草，地瓜圓，芋圓，黑糖粉條，珍珠）".'),
-  quantity: z.number().describe('The quantity of the item ordered, converted to an Arabic numeral.'),
-  specialRequests: z.string().optional().describe('Any special requests for the item (e.g., "extra cheese", "no onions", "less sugar"). If there are NO special requests for an item, this field **MUST BE OMITTED** from the output. Do NOT include this key or set it to null, an empty string, or any placeholder/explanatory text. OMIT THE KEY ENTIRELY if no special requests exist.'),
-  isAmbiguous: z.boolean().optional().describe('Set to true if the user\'s input for this item was ambiguous and could refer to multiple distinct products. If true, the "alternatives" field should be populated.'),
-  alternatives: z.array(z.string()).optional().describe('If isAmbiguous is true, this array should contain the full names of the potential products the user might be referring to.'),
+  item: z.string().describe("Name of the item. If ambiguous (e.g., user says '大滿貫' or '3號' when multiple products match), this field must be the user's exact ambiguous term. Otherwise, it's the full product name."),
+  quantity: z.number().describe('The quantity of the item ordered, as an Arabic numeral.'),
+  specialRequests: z.string().optional().describe("Special requests for the item. This field MUST BE OMITTED ENTIRELY if there are no special requests. Do not include the key or any placeholder value if empty."),
+  isAmbiguous: z.boolean().optional().describe("Set to true if the item is ambiguous and requires user clarification. If true, 'alternatives' must be populated."),
+  alternatives: z.array(z.string()).optional().describe("If 'isAmbiguous' is true, this array must contain the full names of potential products the user might be referring to. Omit if not ambiguous."),
 });
 export type ParsedAiOrderItem = z.infer<typeof ParsedOrderItemSchema>;
 
