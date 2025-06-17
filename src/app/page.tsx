@@ -395,7 +395,7 @@ export default function HomePage() {
       </div>
 
       <Dialog open={isManualOrderDialogOpen} onOpenChange={setIsManualOrderDialogOpen}>
-        <DialogContent className="fixed inset-0 w-screen h-screen max-w-none rounded-none border-0 shadow-none flex flex-col p-0">
+        <DialogContent className="max-w-5xl h-[90vh] sm:h-[80vh] flex flex-col p-0">
            <DialogHeader className="p-6 border-b shrink-0">
             <DialogTitle className="text-3xl font-headline text-primary flex items-center">
               <LayoutGrid className="w-8 h-8 mr-3 text-accent" />
