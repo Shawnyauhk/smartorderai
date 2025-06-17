@@ -21,7 +21,6 @@ const OrderForm: React.FC<OrderFormProps> = ({ onOrderSubmit, isProcessing }) =>
   const { toast } = useToast();
 
   useEffect(() => {
-    // Check for SpeechRecognition API support on component mount
     if (!('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
       toast({
         title: "不支持語音輸入",
@@ -32,7 +31,6 @@ const OrderForm: React.FC<OrderFormProps> = ({ onOrderSubmit, isProcessing }) =>
     }
 
     return () => {
-      // Cleanup: stop recognition if active when component unmounts
       if (recognitionRef.current) {
         recognitionRef.current.stop();
         recognitionRef.current.onresult = null;
@@ -78,12 +76,15 @@ const OrderForm: React.FC<OrderFormProps> = ({ onOrderSubmit, isProcessing }) =>
     }
 
     const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const recognition = new SpeechRecognitionAPI();
-    recognitionRef.current = recognition;
+    if (!recognitionRef.current) {
+        recognitionRef.current = new SpeechRecognitionAPI();
+    }
+    const recognition = recognitionRef.current;
 
-    recognition.lang = 'yue-Hant-HK'; // Cantonese (Traditional Chinese, Hong Kong)
-    recognition.interimResults = false; // We only want final results
-    recognition.continuous = false; // Stops recognizing after a pause in speech
+
+    recognition.lang = 'yue-Hant-HK'; 
+    recognition.interimResults = false; 
+    recognition.continuous = false; 
 
     recognition.onstart = () => {
       setIsRecording(true);
@@ -94,13 +95,15 @@ const OrderForm: React.FC<OrderFormProps> = ({ onOrderSubmit, isProcessing }) =>
     };
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
-      let_transcript = "";
+      let currentTranscript = "";
       for (let i = event.resultIndex; i < event.results.length; ++i) {
         if (event.results[i].isFinal) {
-          _transcript += event.results[i][0].transcript;
+          currentTranscript += event.results[i][0].transcript;
         }
       }
-      setOrderText(prev => (prev ? prev + ' ' + _transcript : _transcript).trim());
+      if (currentTranscript) {
+        setOrderText(prevText => (prevText ? prevText + ' ' + currentTranscript : currentTranscript).trim());
+      }
     };
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
@@ -120,18 +123,29 @@ const OrderForm: React.FC<OrderFormProps> = ({ onOrderSubmit, isProcessing }) =>
         description: errorMessage,
         variant: "destructive",
       });
-      setIsRecording(false); // Ensure UI updates if error occurs before onend
+      // No setIsRecording(false) here, onend will handle it if it's a recoverable error or stop.
+      // If 'not-allowed' or 'audio-capture', it's a more persistent issue.
+      if (event.error === 'not-allowed' || event.error === 'audio-capture') {
+        setIsRecording(false); 
+        recognitionRef.current = null; // Clean up ref if critical error
+      }
     };
 
     recognition.onend = () => {
       setIsRecording(false);
-      if (recognitionRef.current) { // Check if it wasn't cleaned up by an error
+      // Check if recognitionRef.current still exists because an error might have cleared it.
+      if (recognitionRef.current) { 
          toast({
            title: "錄音已結束",
            description: "語音已轉換為文字。",
          });
       }
-      recognitionRef.current = null; // Allow new instance next time
+      // Do not set recognitionRef.current = null here if we want to reuse it,
+      // but generally, it's safer to re-create if continuous=false.
+      // For this non-continuous setup, nullifying allows a fresh start next time.
+      // However, if an error like 'no-speech' occurs, onend is still called.
+      // We only want to truly nullify if it stopped cleanly or due to a major error.
+      // The current logic of creating new if null in handleVoiceInput is okay.
     };
     
     try {
@@ -145,7 +159,7 @@ const OrderForm: React.FC<OrderFormProps> = ({ onOrderSubmit, isProcessing }) =>
       });
       setIsRecording(false);
       if (recognitionRef.current) {
-        recognitionRef.current = null;
+        recognitionRef.current = null; // Clean up ref if start fails
       }
     }
   };
@@ -173,7 +187,7 @@ const OrderForm: React.FC<OrderFormProps> = ({ onOrderSubmit, isProcessing }) =>
               rows={5}
               className="text-base border-2 border-input focus:border-primary transition-colors duration-300"
               aria-label="Order input"
-              disabled={isProcessing}
+              disabled={isProcessing || isRecording}
             />
             <div className="flex flex-col sm:flex-row gap-2">
               <Button
@@ -241,3 +255,4 @@ const OrderForm: React.FC<OrderFormProps> = ({ onOrderSubmit, isProcessing }) =>
 };
 
 export default OrderForm;
+
