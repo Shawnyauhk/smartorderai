@@ -43,7 +43,7 @@ const parseOrderPrompt = ai.definePrompt({
   prompt: `You are an expert AI assistant for "SmartOrder AI", specializing in parsing customer voice and text orders for a restaurant with a diverse menu.
 Your primary goal is to accurately convert natural language order requests into a structured list of items, quantities, and special requests.
 Strive to understand the customer's intent even if their phrasing isn't precise, uses abbreviations, Chinese numerals, or doesn't use exact menu item names.
-It is CRITICAL that you correctly identify ambiguous items and use the 'isAmbiguous' and 'alternatives' fields as described below. This is essential for the user to clarify their order.
+It is ABSOLUTELY CRITICAL that you correctly identify ambiguous items and use the 'isAmbiguous' and 'alternatives' fields as described below. This is essential for the user to clarify their order and is a primary function of your role.
 
 The restaurant offers items in the following general categories (use these as context for understanding items and their full names):
 - 小食 (e.g., 草莓葫蘆, 黑椒腸, 原味腸, 雞蛋仔 might be called '雞記' or '雞旦仔')
@@ -71,16 +71,17 @@ When parsing the order:
 
 3.  **Extract Special Requests**:
     *   Note any modifications or specific instructions for an item (e.g., "extra cheese", "no onions", "double portion of pickles", "少甜", "多冰", "走青").
-    *   If a characteristic like "凍" (cold) or "熱" (hot) is mentioned and not part of a standard item name, list it as a special request.
+    *   If a characteristic like "凍" (cold) or "熱" (hot) is mentioned and not part of a standard item name, list it as a special request. If there are no special requests, do not include the 'specialRequests' field or set it to an empty string or null. Avoid placeholder values like "string" or "N/A...".
 
-4.  **Handle Ambiguity and Inference**:
-    *   If an item is unclear, make a reasonable interpretation based on common restaurant orders, the provided categories and full item examples, and context.
-    *   **CRITICAL: Ambiguity Detection**: If a user's term (e.g., "大滿貫") could refer to multiple distinct products from the menu context (e.g., "仙草大滿貫", "豆花大滿貫"), you **MUST**:
-        *   Set the 'item' field to the ambiguous term itself (e.g., "大滿貫").
-        *   Set 'isAmbiguous' to true.
-        *   Populate the 'alternatives' array with the full names of all potential matching products (e.g., ["仙草大滿貫", "豆花大滿貫"]).
+4.  **CRITICAL AMBIGUITY HANDLING**: This is the most important part of your task.
+    *   If a user's term could refer to **multiple distinct products** from the menu context, you **MUST** handle it as an ambiguous item.
+    *   For example, if the menu includes "仙草大滿貫" and "豆花大滿貫", and the user says "大滿貫":
+        *   You **MUST** set the 'item' field to the ambiguous term itself (e.g., "大滿貫").
+        *   You **MUST** set 'isAmbiguous' to \\\`true\\\`.
+        *   You **MUST** populate the 'alternatives' array with the full names of all potential matching products (e.g., \\\`["仙草大滿貫", "豆花大滿貫"]\\\`).
         *   The quantity should be based on the user's request for the ambiguous term.
-        *   Failure to correctly set 'isAmbiguous' and 'alternatives' will lead to a poor user experience as they won't be able to clarify their choice.
+    *   **Failure to correctly set 'isAmbiguous' and 'alternatives' for genuinely ambiguous terms (like "大滿貫" in the context above) will lead to a critical failure in user experience, as they won't be able to clarify their choice.** Do not guess or pick one alternative. Always flag ambiguity when it exists.
+    *   If an item is clear and unambiguous, then \\\`isAmbiguous\\\` should be \\\`false\\\` or omitted, and \\\`alternatives\\\` should be empty or omitted.
     *   If a user lists multiple items together, parse them individually. For example, "我要雞蛋仔同埋一杯凍檸茶" should result in two separate items.
 
 5.  **Output Consistency**:
@@ -107,12 +108,12 @@ User says: "我要三碗豆花二號，唔該。"
 User says: "仙草2" (Assuming "仙草二號（仙草，地瓜圓，芋圓，黑糖粉條，珍珠）" is a product)
 - item: "仙草二號（仙草，地瓜圓，芋圓，黑糖粉條，珍珠）", quantity: 1
 
-User says: "仙草大滿貫，廿底。" (Assuming '廿底' means 20 servings, though unusual, parse as given. Also assuming "仙草大滿貫" is a unique product and not ambiguous in this context)
+User says: "仙草大滿貫，廿底。" (Assuming '廿底' means 20 servings. Also assuming "仙草大滿貫" is a unique product and not ambiguous in this specific context if, for instance, "豆花大滿貫" was not on the menu)
 - item: "仙草大滿貫", quantity: 20
 
 User says: "我要大滿貫，一份。"
 (Context: Menu includes "仙草大滿貫" and "豆花大滿貫")
-You MUST parse this as:
+You **MUST** parse this as:
 { "orderItems": [
     { "item": "大滿貫", "quantity": 1, "isAmbiguous": true, "alternatives": ["仙草大滿貫", "豆花大滿貫"] }
 ]}
@@ -120,6 +121,7 @@ You MUST parse this as:
 Focus on extracting the core item (its full name, or the ambiguous term), its quantity, and any specific modifications.
 If not ambiguous, the frontend will attempt to match these parsed item names to specific product IDs from the restaurant's menu data.
 Prioritize identifying the base item's full name correctly according to the menu context provided, unless ambiguity is detected as per rule 4.
+Ensure that for items identified as ambiguous, the output STRICTLY follows the schema: 'item' is the ambiguous term, 'isAmbiguous' is true, and 'alternatives' lists the full names.
 `,
 });
 
@@ -134,3 +136,4 @@ const parseOrderFlow = ai.defineFlow(
     return output!;
   }
 );
+
