@@ -1,3 +1,4 @@
+
 "use client";
 
 import type React from 'react';
@@ -45,7 +46,8 @@ const OrderForm: React.FC<OrderFormProps> = ({ onOrderSubmit, isProcessing }) =>
           開始點餐
         </CardTitle>
         <CardDescription className="text-lg">
-          請告訴我們您想點什麼！您可以在下方輸入您的訂單。例如：「我想要兩個仙草3號，一份葡撻雞蛋仔和一杯手打香水檸檬茶。」
+          <p>請告訴我們您想點什麼！您可以在下方輸入您的訂單。</p>
+          <p>例如：「我想要兩個仙草三號，一份葡撻雞蛋仔和一杯手打香水檸檬茶。」</p>
         </CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit}>
