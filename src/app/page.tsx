@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useRef } from 'react'; // Added useRef
+import { useState, useRef } from 'react'; 
 import { parseOrder } from '@/ai/flows/parse-order.ts';
 import type { ParseOrderOutput, ParsedAiOrderItem } from '@/ai/flows/parse-order.ts';
 import type { CartItem, Product } from '@/types';
@@ -29,7 +29,7 @@ export default function HomePage() {
   const [showAiConfirmation, setShowAiConfirmation] = useState(false);
   const [isManualOrderDialogOpen, setIsManualOrderDialogOpen] = useState(false);
 
-  const scrollableContentRef = useRef<HTMLDivElement | null>(null); // Ref for the scrollable div
+  const scrollableContentRef = useRef<HTMLDivElement | null>(null);
 
   const { toast } = useToast();
 
@@ -395,24 +395,24 @@ export default function HomePage() {
       </div>
 
       <Dialog open={isManualOrderDialogOpen} onOpenChange={setIsManualOrderDialogOpen}>
-        <DialogContent className="max-w-3xl p-0">
-          <ScrollArea className="max-h-[80vh]">
-            <div ref={scrollableContentRef} className="p-6"> {/* Added ref here */}
-              <DialogHeader className="mb-6">
-                <DialogTitle className="text-3xl font-headline text-primary flex items-center">
-                  <LayoutGrid className="w-8 h-8 mr-3 text-accent" />
-                  手動選擇餐點
-                </DialogTitle>
-                 <CardDescription className="text-lg text-muted-foreground mt-1">
-                    按產品系列瀏覽，並將產品加入您的訂單。
-                 </CardDescription>
-              </DialogHeader>
+        <DialogContent className="max-w-3xl flex flex-col p-0 h-[90vh] sm:h-auto">
+           <DialogHeader className="p-6 border-b shrink-0">
+            <DialogTitle className="text-3xl font-headline text-primary flex items-center">
+              <LayoutGrid className="w-8 h-8 mr-3 text-accent" />
+              手動選擇餐點
+            </DialogTitle>
+             <CardDescription className="text-lg text-muted-foreground mt-1">
+                按產品系列瀏覽，並將產品加入您的訂單。
+             </CardDescription>
+          </DialogHeader>
+          <ScrollArea className="flex-grow overflow-y-auto">
+            <div ref={scrollableContentRef} className="p-6">
               <ManualOrderSection 
                 allProducts={mockProducts} 
                 onProductAddToCart={(product) => {
                   handleAddToCartFromManualSelection(product);
                 }} 
-                scrollableContainerRef={scrollableContentRef} // Pass ref
+                scrollableContainerRef={scrollableContentRef}
               />
             </div>
           </ScrollArea>
