@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Mic, Send } from 'lucide-react';
+import { Loader2, Mic, Send, XCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface OrderFormProps {
@@ -38,6 +38,10 @@ const OrderForm: React.FC<OrderFormProps> = ({ onOrderSubmit, isProcessing }) =>
     });
   };
 
+  const handleClearInput = () => {
+    setOrderText('');
+  };
+
   return (
     <Card className="w-full shadow-xl hover:shadow-2xl transition-shadow duration-300">
       <CardHeader>
@@ -62,17 +66,30 @@ const OrderForm: React.FC<OrderFormProps> = ({ onOrderSubmit, isProcessing }) =>
               aria-label="Order input"
               disabled={isProcessing}
             />
-            <Button 
-              type="button" 
-              onClick={handleVoiceInput} 
-              variant="outline" 
-              className="w-full sm:w-auto justify-start sm:justify-center group"
-              disabled={isProcessing}
-              aria-label="使用語音輸入 (模擬)"
-            >
-              <Mic className="w-5 h-5 mr-2 group-hover:text-primary transition-colors" /> 
-              使用語音輸入 (模擬)
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button 
+                type="button" 
+                onClick={handleVoiceInput} 
+                variant="outline" 
+                className="w-full sm:flex-1 justify-center group"
+                disabled={isProcessing}
+                aria-label="使用語音輸入 (模擬)"
+              >
+                <Mic className="w-5 h-5 mr-2 group-hover:text-primary transition-colors" /> 
+                語音輸入 (模擬)
+              </Button>
+              <Button
+                type="button"
+                onClick={handleClearInput}
+                variant="outline"
+                className="w-full sm:flex-1 justify-center group"
+                disabled={!orderText || isProcessing}
+                aria-label="清除輸入內容"
+              >
+                <XCircle className="w-5 h-5 mr-2 group-hover:text-destructive transition-colors" />
+                清除內容
+              </Button>
+            </div>
           </div>
         </CardContent>
         <CardFooter>
