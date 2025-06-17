@@ -74,7 +74,7 @@ export default function HomePage() {
     aiSuggestedItems.forEach((aiItem) => {
       if (aiItem.isAmbiguous && aiItem.alternatives && aiItem.alternatives.length > 0) {
         const alternativesText = aiItem.alternatives.join(' 或 ');
-        ambiguousItemsInfo.push(`對於 "${aiItem.item}"，AI 認為可能是：${alternativesText}。`);
+        ambiguousItemsInfo.push(`對於 "${aiItem.item}" (您要求 ${aiItem.quantity}份)，AI 認為可能是：${alternativesText}。`);
         return; 
       }
 
@@ -245,30 +245,39 @@ export default function HomePage() {
             </CardTitle>
             <CardDescription>
               這是AI根據您的描述理解的內容。請確認是否正確，或取消以重新輸入。
-              對於標記為模糊的項目，AI會列出可能的選項，請您在確認前先作判斷。
+              對於有歧義的項目，AI會列出可能的選項，請您在確認前先作判斷。
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {aiSuggestedItems.map((item, index) => {
+              const isItemAmbiguous = item.isAmbiguous && item.alternatives && item.alternatives.length > 0;
               const sr = item.specialRequests;
-              const showSpecialRequests = sr && sr.trim() !== '' && sr.toLowerCase() !== 'string' && !sr.startsWith('N/A (This key was typoed');
-              return (
-                <div key={index} className={`p-3 border rounded-md ${item.isAmbiguous ? 'border-destructive bg-destructive/10' : 'bg-muted/50'}`}>
-                  <p className="font-semibold text-foreground">{item.item} <span className="text-sm text-muted-foreground">(數量: {item.quantity})</span></p>
-                  {showSpecialRequests && (
-                    <p className="text-xs text-primary">特別要求: {item.specialRequests}</p>
-                  )}
-                  {item.isAmbiguous && item.alternatives && item.alternatives.length > 0 && (
-                    <div className="mt-2">
-                      <p className="text-xs text-destructive-foreground font-medium">此項目可能指：</p>
-                      <ul className="list-disc list-inside text-xs text-destructive-foreground/80 pl-4">
-                        {item.alternatives.map(alt => <li key={alt}>{alt}</li>)}
-                      </ul>
-                      <p className="text-xs text-muted-foreground mt-1">請手動添加您想要的具體項目。</p>
-                    </div>
-                  )}
-                </div>
-              );
+              const showSpecialRequestsLine = sr && sr.trim() !== '' && sr.toLowerCase() !== 'string' && !sr.startsWith('N/A (This key was typoed');
+
+              if (isItemAmbiguous) {
+                return (
+                  <div key={index} className="p-3 border rounded-md border-destructive bg-destructive/10">
+                    <p className="font-semibold text-destructive-foreground">
+                      關於「{item.item}」(您要求 {item.quantity}份)，AI 認為可能是以下其中之一：
+                    </p>
+                    <ul className="list-disc list-inside text-sm text-destructive-foreground/90 pl-4 mt-2 space-y-1">
+                      {item.alternatives!.map(alt => <li key={alt}>{alt}</li>)}
+                    </ul>
+                    <p className="text-xs text-muted-foreground mt-3">
+                      由於無法確定，請您從上方選項中選擇一項，並使用「手動選擇餐點」功能將其加入訂單，或更清晰地重新描述此項目。
+                    </p>
+                  </div>
+                );
+              } else {
+                return (
+                  <div key={index} className={`p-3 border rounded-md bg-muted/50`}>
+                    <p className="font-semibold text-foreground">{item.item} <span className="text-sm text-muted-foreground">(數量: {item.quantity})</span></p>
+                    {showSpecialRequestsLine && (
+                      <p className="text-xs text-primary">特別要求: {item.specialRequests}</p>
+                    )}
+                  </div>
+                );
+              }
             })}
           </CardContent>
           <CardFooter className="flex flex-col sm:flex-row justify-end gap-3">
