@@ -2,21 +2,21 @@
 "use client";
 
 import type React from 'react';
-import { useState, useMemo, useEffect, useRef } from 'react'; // Added useEffect, useRef
+import { useState, useMemo, useEffect, useRef } from 'react';
 import type { Product } from '@/types';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import ProductCard from '@/components/ProductCard';
-import { ArrowLeftCircle, LayoutGrid, ShoppingBag, List, ArrowUpCircle } from 'lucide-react'; // Added ArrowUpCircle
+import { ArrowLeftCircle, LayoutGrid, ShoppingBag, List, ArrowUpCircle } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 
 interface ManualOrderSectionProps {
   allProducts: Product[];
   onProductAddToCart: (product: Product) => void;
-  scrollableContainerRef?: React.RefObject<HTMLDivElement | null>; // Added prop
+  scrollableContainerRef?: React.RefObject<HTMLDivElement | null>;
 }
 
-const SCROLL_THRESHOLD = 300; // Pixels to scroll before showing "Back to Top"
+const SCROLL_THRESHOLD = 300; 
 
 const ManualOrderSection: React.FC<ManualOrderSectionProps> = ({ allProducts, onProductAddToCart, scrollableContainerRef }) => {
   const [selectedCategoryName, setSelectedCategoryName] = useState<string | null>(null);
@@ -60,7 +60,7 @@ const ManualOrderSection: React.FC<ManualOrderSectionProps> = ({ allProducts, on
     };
 
     scrollElement.addEventListener('scroll', handleScroll);
-    handleScroll(); // Initial check
+    handleScroll(); 
 
     return () => {
       scrollElement.removeEventListener('scroll', handleScroll);
@@ -76,9 +76,8 @@ const ManualOrderSection: React.FC<ManualOrderSectionProps> = ({ allProducts, on
   
   const handleSelectCategory = (categoryName: string) => {
     setSelectedCategoryName(categoryName);
-    // Reset scroll position when category changes
     scrollableContainerRef?.current?.scrollTo({ top: 0 }); 
-    setShowBackToTop(false); // Hide button until user scrolls in new category
+    setShowBackToTop(false); 
   };
 
   const handleBackToCategories = () => {
@@ -89,29 +88,32 @@ const ManualOrderSection: React.FC<ManualOrderSectionProps> = ({ allProducts, on
 
   if (selectedCategoryName) {
     return (
-      <div className="space-y-6 relative"> {/* Added relative for positioning context if needed */}
-        <div className="sticky top-0 z-10 bg-background py-4 shadow-md">
-          <Button variant="outline" size="sm" onClick={handleBackToCategories} className="mb-3 group">
+      <div className="relative">
+        <div className="sticky top-0 z-20 bg-background py-4 shadow-sm mb-4">
+          <Button variant="outline" size="sm" onClick={handleBackToCategories} className="group">
             <ArrowLeftCircle className="mr-2 h-4 w-4 group-hover:text-primary transition-colors" />
             返回產品系列
           </Button>
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-            <div>
-              <h2 className="text-3xl font-headline font-bold text-primary flex items-center">
-                <List className="w-8 h-8 mr-3 text-accent" />
-                {selectedCategoryName}
-              </h2>
-              <p className="text-md text-muted-foreground mt-1">
-                選擇產品加入您的訂單。點擊產品卡片上的「加入購物車」按鈕。
-              </p>
-            </div>
-          </div>
         </div>
         
-        <Separator className="mt-0 mb-6"/> {/* Ensure separator is below sticky header */}
+        <div className="mb-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                <div>
+                <h2 className="text-3xl font-headline font-bold text-primary flex items-center">
+                    <List className="w-8 h-8 mr-3 text-accent" />
+                    {selectedCategoryName}
+                </h2>
+                <p className="text-md text-muted-foreground mt-1">
+                    選擇產品加入您的訂單。點擊產品卡片上的「加入購物車」按鈕。
+                </p>
+                </div>
+            </div>
+        </div>
+        
+        <Separator className="mb-6"/>
 
         {productsInCategory.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 pb-16"> {/* Added pb-16 for BackToTop button space */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 pb-16">
             {productsInCategory.map(product => (
               <ProductCard 
                 key={product.id} 
@@ -127,34 +129,8 @@ const ManualOrderSection: React.FC<ManualOrderSectionProps> = ({ allProducts, on
         )}
 
         {showBackToTop && (
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={handleScrollToTop}
-            className="fixed bottom-12 right-12 z-20 rounded-full shadow-lg bg-card hover:bg-muted text-primary border-primary" 
-            // Using fixed to position relative to viewport (dialog), adjust bottom/right as needed within dialog's padding.
-            // The dialog has p-6, so bottom-12/right-12 refers to distance from dialog edge if dialog fills viewport.
-            // Or make it bottom-8 right-8 from the parent (p-6 div).
-            // Test with values like bottom-[4rem] right-[calc(50%-1.5rem+1.5rem+theme(spacing.6))] if needed for perfect centering based on scrollbar
-            // For simplicity with dialog max-width:
-            // className="fixed bottom-10 right-10 z-20 rounded-full shadow-lg ..."
-            // Let's try with values that work well within common dialog sizes:
-            // Assuming the DialogContent is max-w-3xl (approx 768px). Scrollbar is on right.
-            // The p-6 of scrollable div is 24px. Button is 40px wide.
-            // right: p-6 + scrollbar_width (approx 10px) + desired_margin (16px) = ~50px from content edge
-            // Fixed positioning is relative to the nearest ancestor with transform, perspective, or filter set to something other than none.
-            // The DialogContent itself is fixed. So fixed here will be relative to browser viewport, then transformed.
-            // For robustness, it's often better to put sticky/absolute elements relative to their scroll container.
-            // Since the button is for the dialog's scroll, sticky to scrollableContentRef's viewport.
-            // Let's try `sticky` at the end of the product list's parent.
-            aria-label="返回頂部"
-          >
-            <ArrowUpCircle className="h-6 w-6" />
-          </Button>
-        )}
-         {showBackToTop && (
-            <div // This button will be sticky relative to the scrollable container (.p-6 div)
-                className="sticky bottom-6 right-6 z-30 float-right mr-1" // mr-1 to avoid overlap with potential scrollbar
+            <div
+                className="sticky bottom-6 right-0 z-30 float-right mr-1" 
             >
                 <Button
                     variant="default"
@@ -180,7 +156,7 @@ const ManualOrderSection: React.FC<ManualOrderSectionProps> = ({ allProducts, on
             <Card 
               key={category.name} 
               className="h-full flex flex-col justify-between hover:shadow-xl transition-shadow duration-300 ease-in-out transform hover:-translate-y-1 cursor-pointer group"
-              onClick={() => handleSelectCategory(category.name)} // Use new handler
+              onClick={() => handleSelectCategory(category.name)}
               tabIndex={0}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleSelectCategory(category.name)}}
               role="button"
@@ -203,6 +179,3 @@ const ManualOrderSection: React.FC<ManualOrderSectionProps> = ({ allProducts, on
 };
 
 export default ManualOrderSection;
-
-
-    
