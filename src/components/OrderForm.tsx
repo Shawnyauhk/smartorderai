@@ -107,7 +107,7 @@ const OrderForm: React.FC<OrderFormProps> = ({ onOrderSubmit, isProcessing }) =>
     };
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-      console.error('Speech recognition error:', event.error);
+      // console.error('Speech recognition error:', event.error); // Removed this line
       let errorMessage = "語音識別時發生未知錯誤。";
       if (event.error === 'no-speech') {
         errorMessage = "未檢測到語音，請再試一次。";
@@ -127,7 +127,9 @@ const OrderForm: React.FC<OrderFormProps> = ({ onOrderSubmit, isProcessing }) =>
       // If 'not-allowed' or 'audio-capture', it's a more persistent issue.
       if (event.error === 'not-allowed' || event.error === 'audio-capture') {
         setIsRecording(false); 
-        recognitionRef.current = null; // Clean up ref if critical error
+        if (recognitionRef.current) { // Check if ref still exists before nullifying
+          recognitionRef.current = null; 
+        }
       }
     };
 
@@ -142,7 +144,7 @@ const OrderForm: React.FC<OrderFormProps> = ({ onOrderSubmit, isProcessing }) =>
       }
       // Do not set recognitionRef.current = null here if we want to reuse it,
       // but generally, it's safer to re-create if continuous=false.
-      // For this non-continuous setup, nullifying allows a fresh start next time.
+      // The current logic of creating new if null in handleVoiceInput is okay.
       // However, if an error like 'no-speech' occurs, onend is still called.
       // We only want to truly nullify if it stopped cleanly or due to a major error.
       // The current logic of creating new if null in handleVoiceInput is okay.
@@ -151,7 +153,7 @@ const OrderForm: React.FC<OrderFormProps> = ({ onOrderSubmit, isProcessing }) =>
     try {
       recognition.start();
     } catch (e) {
-      console.error("Error starting recognition:", e);
+      // console.error("Error starting recognition:", e); // Also consider removing if it causes overlays
       toast({
         title: "啟動錄音失敗",
         description: "無法啟動語音識別功能。請確保麥克風已連接且瀏覽器有權限存取。",
@@ -255,4 +257,3 @@ const OrderForm: React.FC<OrderFormProps> = ({ onOrderSubmit, isProcessing }) =>
 };
 
 export default OrderForm;
-
