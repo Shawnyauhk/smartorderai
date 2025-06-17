@@ -3,7 +3,7 @@
 
 import { useState } from 'react';
 import { parseOrder } from '@/ai/flows/parse-order.ts';
-import type { ParseOrderOutput, ParsedAiOrderItem as AiParsedItem } from '@/ai/flows/parse-order.ts';
+import type { ParseOrderOutput, ParsedAiOrderItem } from '@/ai/flows/parse-order.ts';
 import type { CartItem, Product } from '@/types';
 import { findProductByName, mockProducts } from '@/lib/product-data';
 import OrderForm from '@/components/OrderForm';
@@ -23,7 +23,7 @@ export default function HomePage() {
   const [isProcessingOrder, setIsProcessingOrder] = useState(false);
   const [orderAttempted, setOrderAttempted] = useState(false);
   
-  const [aiSuggestedItems, setAiSuggestedItems] = useState<AiParsedItem[]>([]);
+  const [aiSuggestedItems, setAiSuggestedItems] = useState<ParsedAiOrderItem[]>([]);
   const [showAiConfirmation, setShowAiConfirmation] = useState(false);
 
   const { toast } = useToast();
@@ -69,8 +69,15 @@ export default function HomePage() {
     let currentCartItems = [...parsedOrderItems];
     let newItemsAddedCount = 0;
     let itemsNotFoundStrings: string[] = [];
+    let ambiguousItemsInfo: string[] = [];
 
     aiSuggestedItems.forEach((aiItem) => {
+      if (aiItem.isAmbiguous && aiItem.alternatives && aiItem.alternatives.length > 0) {
+        const alternativesText = aiItem.alternatives.join(' 或 ');
+        ambiguousItemsInfo.push(`對於 "${aiItem.item}"，AI 認為可能是：${alternativesText}。`);
+        return; // Skip adding ambiguous items to the cart for now
+      }
+
       const product = findProductByName(aiItem.item);
       if (product) {
         const existingItemIndex = currentCartItems.findIndex(
@@ -100,7 +107,22 @@ export default function HomePage() {
     setParsedOrderItems(currentCartItems);
     setTotalAmount(newTotal);
 
-    if (newItemsAddedCount > 0 && itemsNotFoundStrings.length === 0) {
+    // Toast notifications logic
+    if (ambiguousItemsInfo.length > 0) {
+      toast({
+        title: "部分項目需要釐清",
+        description: (
+          <div>
+            {ambiguousItemsInfo.map((info, idx) => <p key={idx}>{info}</p>)}
+            <p className="mt-2">請您更明確地指出這些項目，或使用手動選擇功能。其他無歧義的項目已（或嘗試）加入訂單。</p>
+          </div>
+        ),
+        variant: "destructive",
+        duration: 10000,
+      });
+    }
+
+    if (newItemsAddedCount > 0 && itemsNotFoundStrings.length === 0 && ambiguousItemsInfo.length === 0) {
       toast({
         title: "訂單已更新！",
         description: "AI建議的餐點已成功加入您的訂單。",
@@ -114,7 +136,7 @@ export default function HomePage() {
         variant: "destructive",
         duration: 7000,
       });
-    } else if (itemsNotFoundStrings.length > 0) {
+    } else if (newItemsAddedCount === 0 && itemsNotFoundStrings.length > 0 && ambiguousItemsInfo.length === 0 ) {
        toast({
         title: "未能加入AI建議餐點",
         description: `AI建議的餐點均未能找到：${itemsNotFoundStrings.join('、')}。`,
@@ -136,9 +158,9 @@ export default function HomePage() {
   };
 
   const handleAddToCartFromManualSelection = (productToAdd: Product) => {
-    setOrderAttempted(true); // Mark that an order attempt has been made
-    setShowAiConfirmation(false); // Hide AI suggestions if any
-    setAiSuggestedItems([]); // Clear AI suggestions
+    setOrderAttempted(true); 
+    setShowAiConfirmation(false); 
+    setAiSuggestedItems([]); 
 
     setParsedOrderItems(prevItems => {
       const existingItemIndex = prevItems.findIndex(
@@ -200,11 +222,7 @@ export default function HomePage() {
   };
 
   const handlePaymentSelection = (paymentMethod: string) => {
-    // This would typically involve sending the order to a backend
     console.log(`Payment method selected: ${paymentMethod}, Final Order: `, parsedOrderItems, `Total: HK$${totalAmount.toFixed(2)}`);
-    // Potentially clear the cart after successful payment simulation
-    // setParsedOrderItems([]);
-    // setTotalAmount(0);
   };
 
   const showOrderSummary = parsedOrderItems.length > 0;
@@ -228,13 +246,22 @@ export default function HomePage() {
             </CardTitle>
             <CardDescription>
               這是AI根據您的描述理解的內容。請確認是否正確，或取消以重新輸入。
+              對於標記為模糊的項目，AI會列出可能的選項，請您在確認前先作判斷。
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {aiSuggestedItems.map((item, index) => (
-              <div key={index} className="p-3 border rounded-md bg-muted/50">
+              <div key={index} className={`p-3 border rounded-md ${item.isAmbiguous ? 'border-destructive bg-destructive/10' : 'bg-muted/50'}`}>
                 <p className="font-semibold text-foreground">{item.item} <span className="text-sm text-muted-foreground">(數量: {item.quantity})</span></p>
                 {item.specialRequests && <p className="text-xs text-primary">特別要求: {item.specialRequests}</p>}
+                {item.isAmbiguous && item.alternatives && item.alternatives.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-xs text-destructive-foreground font-medium">此項目可能指：</p>
+                    <ul className="list-disc list-inside text-xs text-destructive-foreground/80">
+                      {item.alternatives.map(alt => <li key={alt}>{alt}</li>)}
+                    </ul>
+                  </div>
+                )}
               </div>
             ))}
           </CardContent>

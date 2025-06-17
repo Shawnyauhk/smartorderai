@@ -18,10 +18,14 @@ const ParseOrderInputSchema = z.object({
 export type ParseOrderInput = z.infer<typeof ParseOrderInputSchema>;
 
 const ParsedOrderItemSchema = z.object({
-  item: z.string().describe('The name of the menu item. This should be a common, recognizable name, ideally matching what might appear on a menu, including specific numbered versions like "仙草二號（仙草，地瓜圓，芋圓，黑糖粉條，珍珠）".'),
+  item: z.string().describe('The name of the menu item. If the user\'s request is ambiguous (e.g., "大滿貫" which could be "仙草大滿貫" or "豆花大滿貫"), this should be the ambiguous term itself. Otherwise, it should be the common, recognizable name, ideally matching what might appear on a menu, including specific numbered versions like "仙草二號（仙草，地瓜圓，芋圓，黑糖粉條，珍珠）".'),
   quantity: z.number().describe('The quantity of the item ordered, converted to an Arabic numeral.'),
   specialRequests: z.string().optional().describe('Any special requests for the item (e.g., "extra cheese", "no onions", "less sugar").'),
+  isAmbiguous: z.boolean().optional().describe('Set to true if the user\'s input for this item was ambiguous and could refer to multiple distinct products. If true, the "alternatives" field should be populated.'),
+  alternatives: z.array(z.string()).optional().describe('If isAmbiguous is true, this array should contain the full names of the potential products the user might be referring to.'),
 });
+export type ParsedAiOrderItem = z.infer<typeof ParsedOrderItemSchema>;
+
 
 const ParseOrderOutputSchema = z.object({
   orderItems: z.array(ParsedOrderItemSchema).describe('The list of parsed order items.'),
@@ -42,7 +46,7 @@ Strive to understand the customer's intent even if their phrasing isn't precise,
 
 The restaurant offers items in the following general categories (use these as context for understanding items and their full names):
 - 小食 (e.g., 草莓葫蘆, 黑椒腸, 原味腸, 雞蛋仔 might be called '雞記' or '雞旦仔')
-- 仙草/豆花芋圓 (e.g., 仙草大滿貫, 仙草一號 （仙草，地瓜圓，芋圓，蜜紅豆，芋泥）, 仙草二號（仙草，地瓜圓，芋圓，黑糖粉條，珍珠）, 豆花一號, 豆花二號, 豆花大滿貫)
+- 仙草/豆花芋圓 (e.g., 仙草大滿貫, 仙草一號 （仙草，地瓜圓，芋圓，蜜紅豆，芋泥）, 仙草二號（仙草，地瓜圓，芋圓，黑糖粉條，珍珠）, 豆花一號, 豆花二號, 豆花大滿貫, 豆花三號, 豆花四號, 豆花五號)
 - 香蕉餅/蛋餅 (e.g., 開心果香蕉煎餅, 台式蛋餅, 雪糕香蕉煎餅)
 - 格仔餅 (e.g., 雪糕格仔餅, 原味格仔餅, 開心果格仔餅)
 - 飲品 (e.g., 西瓜沙冰, 泰式奶茶, 港式奶茶, 檸檬茶 might be '凍檸茶' or '檸茶', 手打鴨屎香檸檬茶)
@@ -70,10 +74,15 @@ When parsing the order:
 
 4.  **Handle Ambiguity and Inference**:
     *   If an item is unclear, make a reasonable interpretation based on common restaurant orders, the provided categories and full item examples, and context.
+    *   **Ambiguity Detection**: If a user's term (e.g., "大滿貫") could refer to multiple distinct products from the menu context (e.g., "仙草大滿貫", "豆花大滿貫"), you MUST:
+        *   Set the 'item' field to the ambiguous term itself (e.g., "大滿貫").
+        *   Set 'isAmbiguous' to true.
+        *   Populate the 'alternatives' array with the full names of all potential matching products (e.g., ["仙草大滿貫", "豆花大滿貫"]).
+        *   The quantity should be based on the user's request for the ambiguous term.
     *   If a user lists multiple items together, parse them individually. For example, "我要雞蛋仔同埋一杯凍檸茶" should result in two separate items.
 
 5.  **Output Consistency**:
-    *   Ensure the 'item' field in your output uses the **full and exact common name** for the food/drink item as suggested by the product categories and examples provided. This is critical for the system to match it to specific product IDs later.
+    *   Unless an item is ambiguous (see rule 4), ensure the 'item' field in your output uses the **full and exact common name** for the food/drink item as suggested by the product categories and examples provided. This is critical for the system to match it to specific product IDs later.
     *   The 'quantity' field must always be an Arabic numeral.
 
 Order Text: {{{orderText}}}
@@ -84,11 +93,11 @@ User says: "唔該，我想要一個雞記，要朱古力味，兩份魚蛋，�
 You might parse this into items like:
 - item: "朱古力雞蛋仔", quantity: 1 (extracted "朱古力味" and combined with "雞記" to infer "朱古力雞蛋仔")
 - item: "魚蛋8粒", quantity: 2 (converted "兩份" to 2. "魚蛋" likely maps to "魚蛋8粒" if that's the standard offering)
-- item: "檸檬茶", quantity: 1, specialRequests: "凍, 少甜" (or item: "凍檸檬茶", quantity: 1, specialRequests: "少甜")
+- item: "檸檬茶", quantity: 1, specialRequests: "凍, 少甜"
 
 User says: "一份原味格仔餅，加底，同一杯熱奶茶，唔要糖。"
 - item: "原味格仔餅", quantity: 1, specialRequests: "加底"
-- item: "奶茶", quantity: 1, specialRequests: "熱, 不要糖" (or item: "熱奶茶", quantity: 1, specialRequests: "不要糖")
+- item: "奶茶", quantity: 1, specialRequests: "熱, 不要糖"
 
 User says: "我要三碗豆花二號，唔該。"
 - item: "豆花二號", quantity: 3
@@ -97,11 +106,16 @@ User says: "仙草2" (Assuming "仙草二號（仙草，地瓜圓，芋圓，黑
 - item: "仙草二號（仙草，地瓜圓，芋圓，黑糖粉條，珍珠）", quantity: 1
 
 User says: "仙草大滿貫，廿底。" (Assuming '廿底' means 20 servings, though unusual, parse as given)
-- item: "仙草大滿貫", quantity: 20
+- item: "仙草大滿貫", quantity: 20, isAmbiguous: false (assuming "仙草大滿貫" is a unique product in the menu context provided)
 
-Focus on extracting the core item (its full name), its quantity, and any specific modifications.
-The frontend will attempt to match these parsed item names to specific product IDs from the restaurant's menu data.
-Prioritize identifying the base item's full name correctly according to the menu context provided.
+User says: "我要大滿貫，一份。"
+(Context: Menu includes "仙草大滿貫" and "豆花大滿貫")
+You MUST parse this as:
+- item: "大滿貫", quantity: 1, isAmbiguous: true, alternatives: ["仙草大滿貫", "豆花大滿貫"]
+
+Focus on extracting the core item (its full name, or the ambiguous term), its quantity, and any specific modifications.
+If not ambiguous, the frontend will attempt to match these parsed item names to specific product IDs from the restaurant's menu data.
+Prioritize identifying the base item's full name correctly according to the menu context provided, unless ambiguity is detected as per rule 4.
 `,
 });
 
@@ -116,4 +130,3 @@ const parseOrderFlow = ai.defineFlow(
     return output!;
   }
 );
-

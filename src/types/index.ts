@@ -35,4 +35,6 @@ export interface ParsedAiOrderItem {
   item: string;
   quantity: number;
   specialRequests?: string;
+  isAmbiguous?: boolean;
+  alternatives?: string[];
 }
