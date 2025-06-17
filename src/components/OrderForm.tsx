@@ -71,7 +71,6 @@ const OrderForm: React.FC<OrderFormProps> = ({ onOrderSubmit, isProcessing }) =>
 
     if (isRecording) {
       recognitionRef.current?.stop();
-      // setIsRecording(false); // onend will handle this
       return;
     }
 
@@ -107,14 +106,17 @@ const OrderForm: React.FC<OrderFormProps> = ({ onOrderSubmit, isProcessing }) =>
     };
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-      // console.error('Speech recognition error:', event.error); // Removed this line
       let errorMessage = "語音識別時發生未知錯誤。";
       if (event.error === 'no-speech') {
         errorMessage = "未檢測到語音，請再試一次。";
       } else if (event.error === 'audio-capture') {
         errorMessage = "無法獲取麥克風，請檢查您的麥克風設置和權限。";
       } else if (event.error === 'not-allowed') {
-        errorMessage = "麥克風權限被拒絕。請在瀏覽器設定中允許此網站存取您的麥克風。";
+        if (typeof window !== 'undefined' && window.location.protocol !== 'https:') {
+          errorMessage = "麥克風權限被拒絕。語音輸入功能通常需要安全的 HTTPS 連線。請檢查您的網址是否以 https:// 開頭，或嘗試在瀏覽器設定中明確允許此網址(localhost)的麥克風權限。";
+        } else {
+          errorMessage = "麥克風權限被拒絕。請在瀏覽器設定中允許此網站存取您的麥克風。";
+        }
       } else if (event.error === 'network') {
         errorMessage = "網絡錯誤導致語音識別失敗，請檢查您的網絡連接。";
       }
@@ -123,11 +125,15 @@ const OrderForm: React.FC<OrderFormProps> = ({ onOrderSubmit, isProcessing }) =>
         description: errorMessage,
         variant: "destructive",
       });
-      // No setIsRecording(false) here, onend will handle it if it's a recoverable error or stop.
-      // If 'not-allowed' or 'audio-capture', it's a more persistent issue.
+      
       if (event.error === 'not-allowed' || event.error === 'audio-capture') {
         setIsRecording(false); 
-        if (recognitionRef.current) { // Check if ref still exists before nullifying
+        if (recognitionRef.current) {
+          recognitionRef.current.stop(); 
+          recognitionRef.current.onresult = null;
+          recognitionRef.current.onerror = null;
+          recognitionRef.current.onstart = null;
+          recognitionRef.current.onend = null; // Important: Prevent onend from firing its own toast
           recognitionRef.current = null; 
         }
       }
@@ -135,25 +141,19 @@ const OrderForm: React.FC<OrderFormProps> = ({ onOrderSubmit, isProcessing }) =>
 
     recognition.onend = () => {
       setIsRecording(false);
-      // Check if recognitionRef.current still exists because an error might have cleared it.
+      // Only show a generic "ended" toast if the ref wasn't nulled by a critical error handler.
+      // This avoids double-toasting for 'not-allowed' or 'audio-capture'.
       if (recognitionRef.current) { 
          toast({
            title: "錄音已結束",
-           description: "語音已轉換為文字。",
+           description: "語音識別已停止。",
          });
       }
-      // Do not set recognitionRef.current = null here if we want to reuse it,
-      // but generally, it's safer to re-create if continuous=false.
-      // The current logic of creating new if null in handleVoiceInput is okay.
-      // However, if an error like 'no-speech' occurs, onend is still called.
-      // We only want to truly nullify if it stopped cleanly or due to a major error.
-      // The current logic of creating new if null in handleVoiceInput is okay.
     };
     
     try {
       recognition.start();
     } catch (e) {
-      // console.error("Error starting recognition:", e); // Also consider removing if it causes overlays
       toast({
         title: "啟動錄音失敗",
         description: "無法啟動語音識別功能。請確保麥克風已連接且瀏覽器有權限存取。",
@@ -161,7 +161,12 @@ const OrderForm: React.FC<OrderFormProps> = ({ onOrderSubmit, isProcessing }) =>
       });
       setIsRecording(false);
       if (recognitionRef.current) {
-        recognitionRef.current = null; // Clean up ref if start fails
+        recognitionRef.current.stop();
+        recognitionRef.current.onresult = null;
+        recognitionRef.current.onerror = null;
+        recognitionRef.current.onstart = null;
+        recognitionRef.current.onend = null;
+        recognitionRef.current = null;
       }
     }
   };
@@ -257,3 +262,4 @@ const OrderForm: React.FC<OrderFormProps> = ({ onOrderSubmit, isProcessing }) =>
 };
 
 export default OrderForm;
+
