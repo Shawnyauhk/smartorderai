@@ -17,11 +17,11 @@ const ParseOrderInputSchema = z.object({
 export type ParseOrderInput = z.infer<typeof ParseOrderInputSchema>;
 
 const ParsedOrderItemSchema = z.object({
-  item: z.string().describe("Name of the item. If ambiguous (e.g., user says '大滿貫' or '3號' when multiple products match), this field must be the user's exact ambiguous term. Otherwise, it's the full product name."),
+  item: z.string().describe("Name of the item. If ambiguous, this is the user's term."),
   quantity: z.number().describe('The quantity of the item ordered, as an Arabic numeral.'),
-  specialRequests: z.string().optional().describe("Special requests for the item. This field MUST BE OMITTED ENTIRELY if there are no special requests. Do not include the key or any placeholder value if empty."),
-  isAmbiguous: z.boolean().optional().describe("Set to true if the item is ambiguous and requires user clarification. If true, 'alternatives' must be populated."),
-  alternatives: z.array(z.string()).optional().describe("If 'isAmbiguous' is true, this array must contain the full names of potential products the user might be referring to. Omit if not ambiguous."),
+  specialRequests: z.string().optional().describe("Special requests for the item. Omit this field entirely if there are no special requests."),
+  isAmbiguous: z.boolean().optional().describe("Set to true if the item is ambiguous and requires user clarification."),
+  alternatives: z.array(z.string()).optional().describe("If 'isAmbiguous' is true, this array contains potential products."),
 });
 export type ParsedAiOrderItem = z.infer<typeof ParsedOrderItemSchema>;
 
@@ -56,29 +56,29 @@ The restaurant offers items in the following general categories (use these as co
 
 When parsing the order:
 
-0.  **ULTRA-CRITICAL RULE FOR \`specialRequests\` FIELD**: If there are NO special requests for an item, the \`specialRequests\` field in your JSON output for that item **MUST BE OMITTED ENTIRELY**. Do not include this key in the JSON for that item. Do not set it to \`null\`, an empty string, or ANY placeholder text or ANY explanatory text about this rule. Just OMIT the key entirely if no actual special requests exist. This is the absolute most important rule for this field and failure to comply will result in incorrect system behavior.
+0.  **ULTRA-CRITICAL RULE FOR \`specialRequests\` FIELD**: If there are NO special requests for an item, the \`specialRequests\` field in your JSON output for that item **MUST BE OMITTED ENTIRELY**. Do NOT include this key. Do NOT set it to \`null\`, an empty string, or ANY placeholder/explanatory text. Just OMIT THE KEY if no actual special requests exist. This is the absolute most important rule for this field and failure to comply will result in incorrect system behavior.
 
 1.  **Identify Menu Items**:
     *   Determine the specific food or drink items requested. Use common, recognizable names for items, exactly as they would appear on a detailed menu. For example, if the menu has "仙草二號（仙草，地瓜圓，芋圓，黑糖粉條，珍珠）", use this full name.
     *   Handle abbreviations, common nicknames (e.g., "雞記" for "雞蛋仔", "檸茶" for "檸檬茶"), and slight misspellings.
     *   If a user specifies a partial name with a number (e.g., '仙草2', '豆花1', or '仙草二號'), and a *unique* product in the menu context matches this (e.g., '仙草二號（仙草，地瓜圓，芋圓，黑糖粉條，珍珠）'), you **MUST** identify that specific product (quantity 1 unless specified otherwise, like "仙草二號三碗"). In this case, \`isAmbiguous\` should be \`false\` or omitted.
-    *   If the user input is primarily a number that could refer to a numbered series of items (e.g., "三號", "2號", "五號"), and multiple distinct products in the menu context incorporate this number (e.g., menu has '仙草三號（仙草，地瓜圓，芋圓，珍珠，椰果）' and '豆花三號'), you **MUST** identify ALL such distinct products. Each identified product should be a separate entry in the \`orderItems\` array with its full name. For example, if the user says "三號", and both "仙草三號（仙草，地瓜圓，芋圓，珍珠，椰果）" and "豆花三號" are on the menu, your output should include two separate items: one for "仙草三號（仙草，地瓜圓，芋圓，珍珠，椰果）" (quantity 1) and one for "豆花三號" (quantity 1), unless quantities are otherwise specified. These items should NOT be marked as ambiguous; instead, list them as individual concrete items.
+    *   If the user input is primarily a number that could refer to a numbered series of items (e.g., "三號", "2號", "五號"), and multiple distinct products in the menu context incorporate this number (e.g., menu has '仙草三號（仙草，地瓜圓，芋圓，珍珠，椰果）' and '豆花三號'), you **MUST** identify ALL such distinct products. Each identified product should be a separate entry in the \`orderItems\` array with its full name. For example, if the user says "三號", and both "仙草三號（仙草，地瓜圓，芋圓，珍珠，椰果）" and "豆花三號" are on the menu, your output should include two separate items: one for "仙草三號（仙草，地瓜圓，芋圓，珍珠，椰果）" (quantity 1) and one for "豆花三號" (quantity 1), unless quantities are otherwise specified. These items should NOT be marked as ambiguous; instead, list them as individual concrete items. In this specific case, where a number input is expanded into multiple concrete product items, you should NOT create an additional ambiguous item for the original number term itself (e.g., for "三號"). The output should only contain the identified concrete product items.
 
 2.  **Determine Quantities**:
     *   Convert all quantity mentions to Arabic numerals.
     *   Chinese numbers (e.g., "一", "二", "兩", "三", "四", "五", "六", "七", "八", "九", "十", "廿", "卅") should be converted. For example, "兩個漢堡" means quantity: 2, "三杯可樂" means quantity: 3.
-    *   Common quantity words like "一份", "一個", "一杯", "一碗", "一客" usually imply a quantity of 1. "兩份" means quantity: 2.
+    *   Common quantity words and Chinese measure words like "一份" (yī fèn), "一個" (yī ge), "一杯" (yī bēi), "一碗" (yī wǎn), "一客" (yī kè), "个" (ge) usually imply a quantity of 1 (unless a different number precedes them, e.g., "兩個" means 2). "兩份" means quantity: 2.
     *   If a quantity is not explicitly stated for an item (e.g., "a burger", "可樂"), assume a quantity of 1.
 
 3.  **Extract Special Requests**:
     *   Note any modifications or specific instructions for an item (e.g., "extra cheese", "no onions", "double portion of pickles", "少甜", "多冰", "走青").
     *   If a characteristic like "凍" (cold) or "熱" (hot) is mentioned and not part of a standard item name, list it as a special request.
-    *   **Clarification on Quantities**: Phrases primarily indicating quantity (e.g., "一份", "兩個", "a cup of", "三碗") are used to determine the \`quantity\` field. Such phrases are NOT themselves special requests and MUST NOT be placed in the \`specialRequests\` field. If the only specific instruction related to an item is its quantity, and there are no other modifications or preferences, the \`specialRequests\` field MUST be omitted according to Rule 0.
+    *   **Clarification on Quantities**: Phrases primarily indicating quantity (e.g., "一份", "兩個", "a cup of", "三碗") or simple Chinese measure words (like "个", "杯", "碗", "份") are used to determine the \`quantity\` field. Such phrases and measure words are NOT themselves special requests and MUST NOT be placed in the \`specialRequests\` field. If the only specific instruction related to an item is its quantity, and there are no other modifications or preferences, the \`specialRequests\` field MUST be omitted according to Rule 0.
     *   REMEMBER RULE 0: If there are no special requests, the \`specialRequests\` field **MUST BE OMITTED**.
 
 4.  **CRITICAL AMBIGUITY HANDLING (THE MOST IMPORTANT RULE OF ALL)**: Your ability to correctly identify and flag ambiguity is paramount to the system's usability. FAILURE TO FOLLOW THIS RULE IS A CRITICAL SYSTEM ERROR.
     *   If a user's term (e.g., "大滿貫") could refer to **multiple distinct products** present in the menu context (e.g., the menu has both "仙草大滿貫" AND "豆花大滿貫"), you **MUST** handle it as an ambiguous item. Do not guess or pick one.
-    *   **MANDATORY BEHAVIOR FOR "大滿貫" AMBIGUITY**: If the user says "我要大滿貫，一份。" AND the menu context includes "仙草大滿貫" AND "豆花大滿貫", your output for this specific item within the \`orderItems\` array **MUST BE EXACTLY** this JSON structure (this is the ONLY correct way for this specific ambiguous "大滿貫" case):
+    *   **MANDATORY BEHAVIOR FOR "大滿貫" AMBIGUITY**: If the user's input is simply "大滿貫", or "大滿貫" accompanied only by quantity indicators (like "一份大滿貫", "一個大滿貫"), AND the menu context clearly lists both "仙草大滿貫" AND "豆花大滿貫" as distinct products, your output for this specific ambiguous item **MUST BE EXACTLY** this JSON structure (this is the ONLY correct way for this specific ambiguous "大滿貫" case):
         \`\`\`json
         {
           "item": "大滿貫",
@@ -87,6 +87,7 @@ When parsing the order:
           "alternatives": ["仙草大滿貫", "豆花大滿貫"]
         }
         \`\`\`
+        The quantity should be derived from terms like "一份" (1), "一個" (1), "兩個" (2). If no quantity is explicitly stated with "大滿貫", assume 1. Critically, \`specialRequests\` **MUST BE OMITTED** in this ambiguous case unless there are other, unrelated special requests for "大滿貫" itself (which is unlikely for this specific term). The presence of quantity words like "一份" or "一個" does NOT constitute a special request.
         There are NO exceptions to this. Any other output for this specific "大滿貫" ambiguous case (such as outputting multiple '大滿貫' items, or a single non-ambiguous '大滿貫' item, or failing to provide 'alternatives') is a SEVERE FAILURE.
     *   In general for ambiguous items:
         *   You **MUST** set the 'item' field to the ambiguous term itself as stated by the user (e.g., "大滿貫").
