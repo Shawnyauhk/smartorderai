@@ -29,16 +29,14 @@ const ManualOrderSection: React.FC<ManualOrderSectionProps> = ({ allProducts, on
       return acc;
     }, {} as Record<string, number>);
     
-    // Sort categories by product count (descending) or alphabetically if you prefer
     return Object.entries(categoryMap)
       .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => a.name.localeCompare(b.name, 'zh-HK')); // Sort alphabetically for consistency
+      .sort((a, b) => a.name.localeCompare(b.name, 'zh-HK')); 
 
   }, [allProducts]);
 
   const productsInCategory = useMemo(() => {
     if (!selectedCategoryName) return [];
-    // Sort products within a category, e.g., by name or price
     return allProducts
       .filter(p => p.category === selectedCategoryName)
       .sort((a,b) => a.name.localeCompare(b.name, 'zh-HK'));
@@ -46,7 +44,7 @@ const ManualOrderSection: React.FC<ManualOrderSectionProps> = ({ allProducts, on
 
   if (selectedCategoryName) {
     return (
-      <div className="space-y-6 mt-8">
+      <div className="space-y-6"> {/* Removed mt-8 as Dialog will handle spacing */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <Button variant="outline" size="sm" onClick={() => setSelectedCategoryName(null)} className="mb-4 group">
@@ -82,20 +80,11 @@ const ManualOrderSection: React.FC<ManualOrderSectionProps> = ({ allProducts, on
     );
   }
 
+  // Displaying categories
   return (
-    <div className="space-y-8">
-      <div className="text-center">
-        <h2 className="text-3xl font-headline font-bold text-primary flex items-center justify-center">
-          <LayoutGrid className="w-8 h-8 mr-3 text-accent" />
-          手動選擇餐點
-        </h2>
-        <p className="text-lg text-muted-foreground mt-1">
-          按產品系列瀏覽，並將產品加入您的訂單。
-        </p>
-      </div>
-       <Separator className="my-6" />
+    <div className="space-y-6"> {/* Outer div for structure, title and intro text removed */}
       {categories.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6"> {/* Responsive grid for categories */}
           {categories.map(category => (
             <Card 
               key={category.name} 
@@ -106,9 +95,9 @@ const ManualOrderSection: React.FC<ManualOrderSectionProps> = ({ allProducts, on
               role="button"
               aria-label={`查看 ${category.name} 系列`}
             >
-              <CardHeader className="flex-grow">
-                <CardTitle className="text-2xl font-headline text-primary group-hover:text-accent transition-colors">{category.name}</CardTitle>
-                <CardDescription>{category.count} 種產品</CardDescription>
+              <CardHeader className="flex-grow p-4"> {/* Adjusted padding */}
+                <CardTitle className="text-xl md:text-2xl font-headline text-primary group-hover:text-accent transition-colors">{category.name}</CardTitle>
+                <CardDescription className="text-sm md:text-base">{category.count} 種產品</CardDescription>
               </CardHeader>
             </Card>
           ))}

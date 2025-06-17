@@ -12,10 +12,12 @@ import PaymentSelector from '@/components/PaymentSelector';
 import ManualOrderSection from '@/components/ManualOrderSection';
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from '@/components/ui/separator';
-import { AlertCircle, Check, X, ShoppingCart, Edit3, CheckCircle } from 'lucide-react';
+import { AlertCircle, Check, X, ShoppingCart, Edit3, CheckCircle, LayoutGrid } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 export default function HomePage() {
   const [parsedOrderItems, setParsedOrderItems] = useState<CartItem[]>([]);
@@ -25,6 +27,7 @@ export default function HomePage() {
   
   const [aiSuggestedItems, setAiSuggestedItems] = useState<ParsedAiOrderItem[]>([]);
   const [showAiConfirmation, setShowAiConfirmation] = useState(false);
+  const [isManualOrderDialogOpen, setIsManualOrderDialogOpen] = useState(false);
 
   const { toast } = useToast();
 
@@ -377,11 +380,43 @@ export default function HomePage() {
       )}
 
       <Separator />
+      
+      <div className="flex justify-center my-6">
+        <Button 
+          onClick={() => setIsManualOrderDialogOpen(true)}
+          variant="outline" 
+          size="lg"
+          className="border-primary text-primary hover:bg-primary/10 hover:text-primary shadow-md hover:shadow-lg transition-all duration-300 ease-in-out transform hover:scale-105"
+        >
+          <LayoutGrid className="mr-2 h-5 w-5" />
+          手動選擇餐點
+        </Button>
+      </div>
 
-      <ManualOrderSection 
-        allProducts={mockProducts} 
-        onProductAddToCart={handleAddToCartFromManualSelection} 
-      />
+      <Dialog open={isManualOrderDialogOpen} onOpenChange={setIsManualOrderDialogOpen}>
+        <DialogContent className="max-w-3xl p-0">
+          <ScrollArea className="max-h-[80vh]">
+            <div className="p-6">
+              <DialogHeader className="mb-6">
+                <DialogTitle className="text-3xl font-headline text-primary flex items-center">
+                  <LayoutGrid className="w-8 h-8 mr-3 text-accent" />
+                  手動選擇餐點
+                </DialogTitle>
+                 <CardDescription className="text-lg text-muted-foreground mt-1">
+                    按產品系列瀏覽，並將產品加入您的訂單。
+                 </CardDescription>
+              </DialogHeader>
+              <ManualOrderSection 
+                allProducts={mockProducts} 
+                onProductAddToCart={(product) => {
+                  handleAddToCartFromManualSelection(product);
+                  // setIsManualOrderDialogOpen(false); // Optional: close dialog after adding item
+                }} 
+              />
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
       
       {showOrderSummary && (
         <>
@@ -408,4 +443,3 @@ export default function HomePage() {
     </div>
   );
 }
-
