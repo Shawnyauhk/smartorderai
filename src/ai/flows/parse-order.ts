@@ -20,7 +20,7 @@ export type ParseOrderInput = z.infer<typeof ParseOrderInputSchema>;
 const ParsedOrderItemSchema = z.object({
   item: z.string().describe('The name of the menu item. If the user\'s request is ambiguous (e.g., "大滿貫" which could be "仙草大滿貫" or "豆花大滿貫"), this should be the ambiguous term itself. Otherwise, it should be the common, recognizable name, ideally matching what might appear on a menu, including specific numbered versions like "仙草二號（仙草，地瓜圓，芋圓，黑糖粉條，珍珠）".'),
   quantity: z.number().describe('The quantity of the item ordered, converted to an Arabic numeral.'),
-  specialRequests: z.string().optional().describe('Any special requests for the item (e.g., "extra cheese", "no onions", "less sugar"). If there are NO special requests, this field MUST be omitted or set to an empty string or null. DO NOT output "N/A (no special requests detected, should be empty or omitted.)", "None, should be empty or omitted.)", or the literal string "string", or "string, not applicable here, this should be omitted or null or empty string if no special requests, following the guide strictly, do not output string here. Should be omitted or null or empty string ONLY, and this is the most important rule to follow, same for other items in other examples, do not add explanation here or in other examples." If there are no special requests, this field must be empty or omitted from the output.'),
+  specialRequests: z.string().optional().describe('Any special requests for the item (e.g., "extra cheese", "no onions", "less sugar"). If there are NO special requests for an item, this field SHOULD BE OMITTED from the output. Avoid placeholders or explanatory text in this field like "None", "N/A", or any descriptive sentences explaining this rule.'),
   isAmbiguous: z.boolean().optional().describe('Set to true if the user\'s input for this item was ambiguous and could refer to multiple distinct products. If true, the "alternatives" field should be populated.'),
   alternatives: z.array(z.string()).optional().describe('If isAmbiguous is true, this array should contain the full names of the potential products the user might be referring to.'),
 });
@@ -43,7 +43,6 @@ const parseOrderPrompt = ai.definePrompt({
   prompt: `You are an expert AI assistant for "SmartOrder AI", specializing in parsing customer voice and text orders for a restaurant with a diverse menu.
 Your primary goal is to accurately convert natural language order requests into a structured list of items, quantities, and special requests.
 Strive to understand the customer's intent even if their phrasing isn't precise, uses abbreviations, Chinese numerals, or doesn't use exact menu item names.
-It is ABSOLUTELY CRITICAL that you correctly identify ambiguous items and use the 'isAmbiguous' and 'alternatives' fields as described below. This is essential for the user to clarify their order and is a primary function of your role. FAILURE TO DO SO WILL RESULT IN A POOR USER EXPERIENCE.
 
 The restaurant offers items in the following general categories (use these as context for understanding items and their full names):
 - 小食 (e.g., 草莓葫蘆, 黑椒腸, 原味腸, 雞蛋仔 might be called '雞記' or '雞旦仔')
@@ -57,6 +56,9 @@ The restaurant offers items in the following general categories (use these as co
 - 雞蛋仔 (e.g., 朱古力雞蛋仔, 原味雞蛋仔, 麻糬雞蛋仔, 咸蛋黃雞蛋仔)
 
 When parsing the order:
+
+0.  **ULTRA-CRITICAL RULE FOR \`specialRequests\` FIELD**: If there are NO special requests for an item, the \`specialRequests\` field in your JSON output for that item **MUST be omitted entirely**. Do not include it with \`null\`, an empty string, or ANY placeholder text like "None", "N/A", "string", or any descriptive sentences explaining this rule (e.g., DO NOT output "string, not applicable here, this should be omitted or null or empty string if no special requests..."). Just OMIT the key entirely if no special requests exist. This is the absolute most important rule for this field and failure to comply will result in incorrect system behavior.
+
 1.  **Identify Menu Items**:
     *   Determine the specific food or drink items requested. Use common, recognizable names for items, exactly as they would appear on a detailed menu. For example, if the menu has "仙草二號（仙草，地瓜圓，芋圓，黑糖粉條，珍珠）", use this full name.
     *   Handle abbreviations, common nicknames (e.g., "雞記" for "雞蛋仔", "檸茶" for "檸檬茶"), and slight misspellings.
@@ -72,31 +74,40 @@ When parsing the order:
 3.  **Extract Special Requests**:
     *   Note any modifications or specific instructions for an item (e.g., "extra cheese", "no onions", "double portion of pickles", "少甜", "多冰", "走青").
     *   If a characteristic like "凍" (cold) or "熱" (hot) is mentioned and not part of a standard item name, list it as a special request.
-    *   **ULTRA-CRITICAL RULE FOR \`specialRequests\` FIELD**: If there are no special requests for an item, the 'specialRequests' field in your output **MUST** be omitted entirely, or set to an empty string (\\"\\"), or set to \`null\`. You **MUST NOT** output placeholder strings like "N/A (no special requests detected, should be empty or omitted.)", "None, should be empty or omitted.)", the literal string "string", or the long explanation "string, not applicable here, this should be omitted or null or empty string if no special requests, following the guide strictly, do not output string here. Should be omitted or null or empty string ONLY, and this is the most important rule to follow, same for other items in other examples, do not add explanation here or in other examples.". This field **MUST BE EMPTY OR OMITTED** if there are no actual special requests. This is critical for correct display and system function.
+    *   REMEMBER RULE 0: If there are no special requests, the \`specialRequests\` field **MUST BE OMITTED**.
 
-4.  **CRITICAL AMBIGUITY HANDLING (THE MOST IMPORTANT RULE)**: Your ability to correctly identify and flag ambiguity is paramount to the system's usability.
+4.  **CRITICAL AMBIGUITY HANDLING (THE MOST IMPORTANT RULE OF ALL)**: Your ability to correctly identify and flag ambiguity is paramount to the system's usability. FAILURE TO FOLLOW THIS RULE IS A CRITICAL SYSTEM ERROR.
     *   If a user's term (e.g., "大滿貫") could refer to **multiple distinct products** present in the menu context (e.g., the menu has both "仙草大滿貫" AND "豆花大滿貫"), you **MUST** handle it as an ambiguous item. Do not guess or pick one.
-    *   In such a case:
+    *   **MANDATORY BEHAVIOR FOR "大滿貫" AMBIGUITY**: If the user says "我要大滿貫，一份。" AND the menu context includes "仙草大滿貫" AND "豆花大滿貫", your output for this specific item within the \`orderItems\` array **MUST BE EXACTLY** this JSON structure:
+        \`\`\`json
+        {
+          "item": "大滿貫",
+          "quantity": 1,
+          "isAmbiguous": true,
+          "alternatives": ["仙草大滿貫", "豆花大滿貫"]
+        }
+        \`\`\`
+        There are NO exceptions to this. Any other output for this specific "大滿貫" ambiguous case is a SEVERE FAILURE.
+    *   In general for ambiguous items:
         *   You **MUST** set the 'item' field to the ambiguous term itself (e.g., "大滿貫").
         *   You **MUST** set 'isAmbiguous' to \`true\`.
         *   You **MUST** populate the 'alternatives' array with the full names of ALL potential matching products (e.g., \`["仙草大滿貫", "豆花大滿貫"]\`).
         *   The quantity should be based on the user's request for the ambiguous term.
-    *   **FAILURE TO DO THIS IS A CRITICAL ERROR**: If you do not correctly set 'isAmbiguous' to \`true\` and provide the 'alternatives' list for genuinely ambiguous terms (like "大滿貫" when both "仙草大滿貫" and "豆花大滿貫" are on the menu), the user will not be able to clarify their choice, and the order will be incorrect. This is a primary function; do not fail here.
     *   If an item is clear and unambiguous (e.g., user says "仙草大滿貫" directly, or "漢堡" if there's only one type of burger), then \`isAmbiguous\` should be \`false\` or omitted, and \`alternatives\` should be empty or omitted.
     *   If a user lists multiple items together, parse them individually. For example, "我要雞蛋仔同埋一杯凍檸茶" should result in two separate items.
 
 5.  **Output Consistency**:
-    *   Unless an item is ambiguous (see rule 4), ensure the 'item' field in your output uses the **full and exact common name** for the food/drink item as suggested by the product categories and examples provided. This is critical for the system to match it to specific product IDs later.
+    *   Unless an item is ambiguous (see rule 4), ensure the 'item' field in your output uses the **full and exact common name** for the food/drink item as suggested by the product categories and examples provided.
     *   The 'quantity' field must always be an Arabic numeral.
 
 Order Text: {{{orderText}}}
 
 Your output MUST be a valid JSON object matching the specified schema.
-Examples of how to interpret:
+Examples of how to interpret (besides the mandatory "大滿貫" example above):
 User says: "唔該，我想要一個雞記，要朱古力味，兩份魚蛋，同埋一杯凍檸茶，少甜。"
 You might parse this into items like:
-- item: "朱古力雞蛋仔", quantity: 1
-- item: "魚蛋8粒", quantity: 2
+- item: "朱古力雞蛋仔", quantity: 1 (specialRequests omitted as per Rule 0)
+- item: "魚蛋8粒", quantity: 2 (specialRequests omitted as per Rule 0)
 - item: "檸檬茶", quantity: 1, specialRequests: "凍, 少甜"
 
 User says: "一份原味格仔餅，加底，同一杯熱奶茶，唔要糖。"
@@ -104,36 +115,13 @@ User says: "一份原味格仔餅，加底，同一杯熱奶茶，唔要糖。"
 - item: "奶茶", quantity: 1, specialRequests: "熱, 不要糖"
 
 User says: "我要三碗豆花二號，唔該。"
-- item: "豆花二號", quantity: 3
+- item: "豆花二號", quantity: 3 (specialRequests omitted as per Rule 0)
 
 User says: "仙草2" (Assuming "仙草二號（仙草，地瓜圓，芋圓，黑糖粉條，珍珠）" is a product)
-- item: "仙草二號（仙草，地瓜圓，芋圓，黑糖粉條，珍珠）", quantity: 1
+- item: "仙草二號（仙草，地瓜圓，芋圓，黑糖粉條，珍珠）", quantity: 1 (specialRequests omitted as per Rule 0)
 
-User says: "仙草大滿貫，廿底。" (Assuming '廿底' means 20 servings. Also assuming "仙草大滿貫" is a unique product and not ambiguous in this specific context if, for instance, "豆花大滿貫" was not on the menu)
-- item: "仙草大滿貫", quantity: 20
-
-User says: "我要大滿貫，一份。"
-(Context: Menu includes "仙草大滿貫" and "豆花大滿貫")
-You **MUST** parse this as:
-\`\`\`json
-{ 
-  "orderItems": [
-    { 
-      "item": "大滿貫", 
-      "quantity": 1, 
-      "isAmbiguous": true, 
-      "alternatives": ["仙草大滿貫", "豆花大滿貫"] 
-    }
-  ]
-}
-\`\`\`
-THIS IS THE ONLY CORRECT WAY TO PARSE "大滿貫" WHEN IT IS AMBIGUOUS. DO NOT DEVIATE. DO NOT GUESS. YOU MUST PROVIDE \`isAmbiguous: true\` AND THE \`alternatives\` ARRAY.
-
-Focus on extracting the core item (its full name, or the ambiguous term), its quantity, and any specific modifications.
-If not ambiguous, the frontend will attempt to match these parsed item names to specific product IDs from the restaurant's menu data.
-Prioritize identifying the base item's full name correctly according to the menu context provided, unless ambiguity is detected as per rule 4.
-Ensure that for items identified as ambiguous, the output STRICTLY follows the schema: 'item' is the ambiguous term, 'isAmbiguous' is true, and 'alternatives' lists the full names.
-Remember, for \`specialRequests\`, if there are none, the field MUST be omitted or \`null\` or an empty string (\\"\\"). DO NOT invent placeholders.
+Remember, for \`specialRequests\`, if there are none, the field **MUST BE OMITTED** (Rule 0).
+For AMBIGUOUS items like "大滿貫" when multiple products match, you **MUST** follow the exact JSON structure provided in Rule 4.
 `,
 });
 
