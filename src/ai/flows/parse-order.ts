@@ -20,8 +20,8 @@ const ParsedOrderItemSchema = z.object({
   item: z.string().describe("Name of the item. If ambiguous, this is the user's term."),
   quantity: z.number().describe('The quantity of the item ordered, as an Arabic numeral.'),
   specialRequests: z.string().optional().describe("Special requests for the item. Omit this field entirely if there are no special requests."),
-  isAmbiguous: z.boolean().optional().describe("Set to true if the item is ambiguous and requires user clarification."),
-  alternatives: z.array(z.string()).optional().describe("If 'isAmbiguous' is true, this array contains potential products."),
+  isAmbiguous: z.boolean().optional().describe("True if item requires clarification."),
+  alternatives: z.array(z.string()).optional().describe("Potential products if ambiguous."),
 });
 export type ParsedAiOrderItem = z.infer<typeof ParsedOrderItemSchema>;
 
@@ -78,17 +78,14 @@ When parsing the order:
 
 4.  **CRITICAL AMBIGUITY HANDLING (THE MOST IMPORTANT RULE OF ALL)**: Your ability to correctly identify and flag ambiguity is paramount to the system's usability. FAILURE TO FOLLOW THIS RULE IS A CRITICAL SYSTEM ERROR.
     *   If a user's term (e.g., "大滿貫") could refer to **multiple distinct products** present in the menu context (e.g., the menu has both "仙草大滿貫" AND "豆花大滿貫"), you **MUST** handle it as an ambiguous item. Do not guess or pick one.
-    *   **MANDATORY BEHAVIOR FOR "大滿貫" AMBIGUITY**: If the user's input is simply "大滿貫", or "大滿貫" accompanied only by quantity indicators (like "一份大滿貫", "一個大滿貫"), AND the menu context clearly lists both "仙草大滿貫" AND "豆花大滿貫" as distinct products, your output for this specific ambiguous item **MUST BE EXACTLY** this JSON structure (this is the ONLY correct way for this specific ambiguous "大滿貫" case):
-        \`\`\`json
-        {
-          "item": "大滿貫",
-          "quantity": 1, 
-          "isAmbiguous": true,
-          "alternatives": ["仙草大滿貫", "豆花大滿貫"]
-        }
-        \`\`\`
-        The quantity should be derived from terms like "一份" (1), "一個" (1), "兩個" (2). If no quantity is explicitly stated with "大滿貫", assume 1. Critically, \`specialRequests\` **MUST BE OMITTED** in this ambiguous case unless there are other, unrelated special requests for "大滿貫" itself (which is unlikely for this specific term). The presence of quantity words like "一份" or "一個" does NOT constitute a special request.
-        There are NO exceptions to this. Any other output for this specific "大滿貫" ambiguous case (such as outputting multiple '大滿貫' items, or a single non-ambiguous '大滿貫' item, or failing to provide 'alternatives') is a SEVERE FAILURE.
+    *   **MANDATORY BEHAVIOR FOR "大滿貫" AMBIGUITY**: If a user's request is "大滿貫" (or "一份大滿貫", "一個大滿貫", etc.), and *NOT* "仙草大滿貫" or "豆花大滿貫" directly, and the menu includes both "仙草大滿貫" and "豆花大滿貫", then:
+        *   You **MUST** produce exactly one item in the \`orderItems\` array for "大滿貫".
+        *   This item **MUST** have \`item: "大滿貫"\`.
+        *   This item **MUST** have \`isAmbiguous: true\`.
+        *   This item **MUST** have \`alternatives: ["仙草大滿貫", "豆花大滿貫"]\`.
+        *   The \`quantity\` should be 1 if no quantity is specified by the user. If the user says "大滿貫一份" or "大滿貫一個" or "大滿貫个", the \`quantity\` is 1. If "大滿貫兩個", \`quantity\` is 2, and so on.
+        *   The \`specialRequests\` field for this "大滿貫" item **MUST BE OMITTED ENTIRELY** as per Rule 0 and Rule 3, because phrases like "一份", "一個", or "个" are for quantity, not special requests.
+        *   Any deviation from this specific structure (e.g., outputting multiple "大滿貫" items, or a single non-ambiguous "大滿貫" item without alternatives, or including quantity words like "个" in \`specialRequests\`) is a CRITICAL FAILURE.
     *   In general for ambiguous items:
         *   You **MUST** set the 'item' field to the ambiguous term itself as stated by the user (e.g., "大滿貫").
         *   You **MUST** set 'isAmbiguous' to \`true\`.
