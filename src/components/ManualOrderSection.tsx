@@ -89,6 +89,7 @@ const ManualOrderSection: React.FC<ManualOrderSectionProps> = ({ allProducts, on
   if (selectedCategoryName) {
     return (
       <div className="relative">
+        {/* Sticky Back Button ONLY */}
         <div className="sticky top-0 z-20 bg-background py-4 shadow-sm mb-4">
           <Button variant="outline" size="sm" onClick={handleBackToCategories} className="group">
             <ArrowLeftCircle className="mr-2 h-4 w-4 group-hover:text-primary transition-colors" />
@@ -96,6 +97,7 @@ const ManualOrderSection: React.FC<ManualOrderSectionProps> = ({ allProducts, on
           </Button>
         </div>
         
+        {/* Non-Sticky Title and Description */}
         <div className="mb-4">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                 <div>
@@ -179,3 +181,4 @@ const ManualOrderSection: React.FC<ManualOrderSectionProps> = ({ allProducts, on
 };
 
 export default ManualOrderSection;
+
