@@ -249,23 +249,27 @@ export default function HomePage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {aiSuggestedItems.map((item, index) => (
-              <div key={index} className={`p-3 border rounded-md ${item.isAmbiguous ? 'border-destructive bg-destructive/10' : 'bg-muted/50'}`}>
-                <p className="font-semibold text-foreground">{item.item} <span className="text-sm text-muted-foreground">(數量: {item.quantity})</span></p>
-                {item.specialRequests && item.specialRequests.toLowerCase() !== 'string' && item.specialRequests.trim() !== '' && (
-                  <p className="text-xs text-primary">特別要求: {item.specialRequests}</p>
-                )}
-                {item.isAmbiguous && item.alternatives && item.alternatives.length > 0 && (
-                  <div className="mt-2">
-                    <p className="text-xs text-destructive-foreground font-medium">此項目可能指：</p>
-                    <ul className="list-disc list-inside text-xs text-destructive-foreground/80 pl-4">
-                      {item.alternatives.map(alt => <li key={alt}>{alt}</li>)}
-                    </ul>
-                    <p className="text-xs text-muted-foreground mt-1">請手動添加您想要的具體項目。</p>
-                  </div>
-                )}
-              </div>
-            ))}
+            {aiSuggestedItems.map((item, index) => {
+              const sr = item.specialRequests;
+              const showSpecialRequests = sr && sr.trim() !== '' && sr.toLowerCase() !== 'string' && !sr.startsWith('N/A (This key was typoed');
+              return (
+                <div key={index} className={`p-3 border rounded-md ${item.isAmbiguous ? 'border-destructive bg-destructive/10' : 'bg-muted/50'}`}>
+                  <p className="font-semibold text-foreground">{item.item} <span className="text-sm text-muted-foreground">(數量: {item.quantity})</span></p>
+                  {showSpecialRequests && (
+                    <p className="text-xs text-primary">特別要求: {item.specialRequests}</p>
+                  )}
+                  {item.isAmbiguous && item.alternatives && item.alternatives.length > 0 && (
+                    <div className="mt-2">
+                      <p className="text-xs text-destructive-foreground font-medium">此項目可能指：</p>
+                      <ul className="list-disc list-inside text-xs text-destructive-foreground/80 pl-4">
+                        {item.alternatives.map(alt => <li key={alt}>{alt}</li>)}
+                      </ul>
+                      <p className="text-xs text-muted-foreground mt-1">請手動添加您想要的具體項目。</p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </CardContent>
           <CardFooter className="flex flex-col sm:flex-row justify-end gap-3">
             <Button variant="outline" onClick={handleCancelAiSuggestions} className="w-full sm:w-auto">
