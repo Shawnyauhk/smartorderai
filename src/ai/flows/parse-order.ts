@@ -39,6 +39,14 @@ const parseOrderPrompt = ai.definePrompt({
   name: 'parseOrderPrompt',
   input: {schema: ParseOrderInputSchema},
   output: {schema: ParseOrderOutputSchema},
+  config: {
+    safetySettings: [
+      { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+    ],
+  },
   prompt: `You are an expert AI assistant for "SmartOrder AI", specializing in parsing customer voice and text orders for a restaurant with a diverse menu.
 Your primary goal is to accurately convert natural language order requests into a structured list of items, quantities, and special requests.
 Strive to understand the customer's intent even if their phrasing isn't precise, uses abbreviations, Chinese numerals, or doesn't use exact menu item names.
@@ -135,5 +143,3 @@ const parseOrderFlow = ai.defineFlow(
     return output!;
   }
 );
-
-    
