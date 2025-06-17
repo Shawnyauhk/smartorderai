@@ -287,7 +287,7 @@ export default function HomePage() {
             </Button>
             <Button onClick={handleConfirmAiSuggestions} className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white">
               <Check className="mr-2 h-4 w-4" />
-              確認並加入無歧義項目
+              確認並加入項目
             </Button>
           </CardFooter>
         </Card>
