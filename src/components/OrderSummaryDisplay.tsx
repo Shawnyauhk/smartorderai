@@ -9,7 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { UtensilsCrossed, Tag, CheckCircle, PlusCircle, MinusCircle, Trash2, ShoppingBag } from 'lucide-react';
+import { UtensilsCrossed, Tag, PlusCircle, MinusCircle, Trash2, ShoppingCart } from 'lucide-react';
 
 interface OrderSummaryDisplayProps {
   items: CartItem[];
@@ -108,4 +108,3 @@ const OrderSummaryDisplay: React.FC<OrderSummaryDisplayProps> = ({ items, totalA
 };
 
 export default OrderSummaryDisplay;
-
