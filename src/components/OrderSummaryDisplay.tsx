@@ -65,7 +65,7 @@ const OrderSummaryDisplay: React.FC<OrderSummaryDisplayProps> = ({ items, totalA
                   <div className="flex-grow">
                     <h3 className="text-xl font-semibold font-headline text-foreground">{item.name}</h3>
                     <p className="text-sm text-muted-foreground">
-                      單價: HK$${item.unitPrice.toFixed(2)}
+                      單價: HK${item.unitPrice.toFixed(2)}
                     </p>
                   </div>
                 </div>
@@ -79,7 +79,7 @@ const OrderSummaryDisplay: React.FC<OrderSummaryDisplayProps> = ({ items, totalA
                   </Button>
                 </div>
                  <p className="text-lg font-semibold text-primary sm:ml-4 w-28 text-right flex-shrink-0">
-                    HK$${(item.quantity * item.unitPrice).toFixed(2)}
+                    HK${(item.quantity * item.unitPrice).toFixed(2)}
                  </p>
                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => onRemoveItem(item.productId)} aria-label={`移除 ${item.name}`}>
                     <Trash2 className="h-5 w-5" />
@@ -100,7 +100,7 @@ const OrderSummaryDisplay: React.FC<OrderSummaryDisplayProps> = ({ items, totalA
         <Separator />
         <div className="flex justify-between items-center text-2xl font-bold mt-4">
           <span className="font-headline text-primary flex items-center"><Tag className="w-6 h-6 mr-2"/>總金額：</span>
-          <span className="text-accent">HK$${totalAmount.toFixed(2)}</span>
+          <span className="text-accent">HK${totalAmount.toFixed(2)}</span>
         </div>
       </CardFooter>
     </Card>
