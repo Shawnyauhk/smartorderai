@@ -3,8 +3,8 @@
 
 import { useState } from 'react';
 import { parseOrder } from '@/ai/flows/parse-order.ts';
-import type { ParseOrderOutput } from '@/ai/flows/parse-order.ts';
-import type { CartItem, ParsedAiOrderItem, Product } from '@/types';
+import type { ParseOrderOutput, ParsedAiOrderItem as AiParsedItem } from '@/ai/flows/parse-order.ts';
+import type { CartItem, Product } from '@/types';
 import { findProductByName, mockProducts } from '@/lib/product-data';
 import OrderForm from '@/components/OrderForm';
 import OrderSummaryDisplay from '@/components/OrderSummaryDisplay';
@@ -12,24 +12,31 @@ import PaymentSelector from '@/components/PaymentSelector';
 import ManualOrderSection from '@/components/ManualOrderSection';
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from '@/components/ui/separator';
-import { AlertCircle, Info, PlusCircle as PlusCircleIcon } from 'lucide-react';
+import { AlertCircle, Check, X, ShoppingCart, Edit3 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 
 export default function HomePage() {
   const [parsedOrderItems, setParsedOrderItems] = useState<CartItem[]>([]);
   const [totalAmount, setTotalAmount] = useState(0);
   const [isProcessingOrder, setIsProcessingOrder] = useState(false);
   const [orderAttempted, setOrderAttempted] = useState(false);
+  
+  const [aiSuggestedItems, setAiSuggestedItems] = useState<AiParsedItem[]>([]);
+  const [showAiConfirmation, setShowAiConfirmation] = useState(false);
+
   const { toast } = useToast();
+
+  const recalculateTotal = (items: CartItem[]) => {
+    return items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+  };
 
   const handleOrderSubmit = async (orderText: string) => {
     setIsProcessingOrder(true);
     setOrderAttempted(true);
-    // Clear previous AI parsed items, but keep manually added ones if desired (not implemented here, clears all)
-    // For now, let's assume AI order overrides or starts fresh for simplicity matching original behavior
-    setParsedOrderItems([]); 
-    setTotalAmount(0);
+    setShowAiConfirmation(false);
+    setAiSuggestedItems([]);
 
     try {
       const result: ParseOrderOutput = await parseOrder({ orderText });
@@ -37,20 +44,42 @@ export default function HomePage() {
       if (!result || !result.orderItems || result.orderItems.length === 0) {
         toast({
           title: "未能理解訂單",
-          description: "抱歉，我們無法理解您的訂單。請嘗試重新描述或說得更具體一些。",
+          description: "抱歉，AI無法從您的描述中解析出任何有效的餐點。請嘗試更清晰地描述，或使用手動選擇功能。",
           variant: "destructive",
         });
         setIsProcessingOrder(false);
         return;
       }
+      setAiSuggestedItems(result.orderItems);
+      setShowAiConfirmation(true);
 
-      const currentCartItems: CartItem[] = [];
-      let currentTotal = 0;
-      let itemsNotFound: string[] = [];
+    } catch (error) {
+      console.error("Error parsing order:", error);
+      toast({
+        title: "AI處理錯誤",
+        description: "AI在解析您的訂單時遇到問題，請重試。",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessingOrder(false);
+    }
+  };
 
-      result.orderItems.forEach((aiItem: ParsedAiOrderItem) => {
-        const product = findProductByName(aiItem.item);
-        if (product) {
+  const handleConfirmAiSuggestions = () => {
+    let currentCartItems = [...parsedOrderItems];
+    let newItemsAddedCount = 0;
+    let itemsNotFoundStrings: string[] = [];
+
+    aiSuggestedItems.forEach((aiItem) => {
+      const product = findProductByName(aiItem.item);
+      if (product) {
+        const existingItemIndex = currentCartItems.findIndex(
+          (cartItem) => cartItem.productId === product.id && cartItem.specialRequests === (aiItem.specialRequests || undefined)
+        );
+
+        if (existingItemIndex > -1) {
+          currentCartItems[existingItemIndex].quantity += aiItem.quantity;
+        } else {
           currentCartItems.push({
             productId: product.id,
             name: product.name,
@@ -60,98 +89,167 @@ export default function HomePage() {
             imageUrl: product.imageUrl,
             "data-ai-hint": product["data-ai-hint"],
           });
-          currentTotal += product.price * aiItem.quantity;
-        } else {
-          itemsNotFound.push(aiItem.item);
         }
-      });
-
-      setParsedOrderItems(currentCartItems);
-      setTotalAmount(currentTotal);
-
-      if (itemsNotFound.length > 0) {
-         toast({
-          title: "部分食品未能找到",
-          description: `未能找到：${itemsNotFound.join('、')}。請檢查我們的餐牌或重試。其他食品已成功加入。`,
-          variant: "destructive",
-          duration: 7000,
-        });
-      } else if (currentCartItems.length > 0) {
-        toast({
-          title: "訂單已處理！",
-          description: "您的訂單已成功處理。請於下方核對。",
-          variant: "default",
-          className: "bg-green-500 text-white border-green-600"
-        });
+        newItemsAddedCount++;
       } else {
-         toast({
-          title: "未找到有效食品",
-          description: "我們在餐牌中找不到您訂單中的任何有效食品。",
-          variant: "destructive",
-        });
+        itemsNotFoundStrings.push(aiItem.item);
       }
+    });
 
-    } catch (error) {
-      console.error("Error parsing order:", error);
+    const newTotal = recalculateTotal(currentCartItems);
+    setParsedOrderItems(currentCartItems);
+    setTotalAmount(newTotal);
+
+    if (newItemsAddedCount > 0 && itemsNotFoundStrings.length === 0) {
       toast({
-        title: "處理錯誤",
-        description: "處理您的訂單時發生錯誤，請重試。",
+        title: "訂單已更新！",
+        description: "AI建議的餐點已成功加入您的訂單。",
+        variant: "default",
+        className: "bg-green-500 text-white border-green-600"
+      });
+    } else if (newItemsAddedCount > 0 && itemsNotFoundStrings.length > 0) {
+      toast({
+        title: "部分餐點已加入",
+        description: `AI建議的部分餐點已加入。未能找到：${itemsNotFoundStrings.join('、')}。`,
+        variant: "destructive",
+        duration: 7000,
+      });
+    } else if (itemsNotFoundStrings.length > 0) {
+       toast({
+        title: "未能加入AI建議餐點",
+        description: `AI建議的餐點均未能找到：${itemsNotFoundStrings.join('、')}。`,
         variant: "destructive",
       });
-    } finally {
-      setIsProcessingOrder(false);
     }
+    
+    setShowAiConfirmation(false);
+    setAiSuggestedItems([]);
+  };
+
+  const handleCancelAiSuggestions = () => {
+    setShowAiConfirmation(false);
+    setAiSuggestedItems([]);
+    toast({
+      title: "已取消AI建議",
+      description: "您可以重新輸入或手動選擇餐點。",
+    });
   };
 
   const handleAddToCartFromManualSelection = (productToAdd: Product) => {
-    setOrderAttempted(true);
+    setOrderAttempted(true); // Mark that an order attempt has been made
+    setShowAiConfirmation(false); // Hide AI suggestions if any
+    setAiSuggestedItems([]); // Clear AI suggestions
+
     setParsedOrderItems(prevItems => {
       const existingItemIndex = prevItems.findIndex(
-        item => item.productId === productToAdd.id && !item.specialRequests // Simple check for existing item without special requests
+        item => item.productId === productToAdd.id && !item.specialRequests 
       );
       let newItems = [...prevItems];
       if (existingItemIndex > -1) {
-        // Item already exists, increase quantity
         newItems[existingItemIndex] = {
           ...newItems[existingItemIndex],
           quantity: newItems[existingItemIndex].quantity + 1,
         };
       } else {
-        // Add new item
         newItems.push({
           productId: productToAdd.id,
           name: productToAdd.name,
           quantity: 1,
           unitPrice: productToAdd.price,
-          specialRequests: undefined, // For now, special requests only via AI or future enhancement
+          specialRequests: undefined, 
           imageUrl: productToAdd.imageUrl,
           "data-ai-hint": productToAdd["data-ai-hint"],
         });
       }
+      setTotalAmount(recalculateTotal(newItems));
       return newItems;
     });
-
-    setTotalAmount(prevTotal => prevTotal + productToAdd.price);
 
     toast({
       title: "已加入購物車",
       description: `${productToAdd.name} 已成功加入您的訂單。`,
       variant: "default",
-      // className: "bg-green-500 text-white border-green-600" // Using default style
     });
   };
 
-
-  const handlePaymentSelection = (paymentMethod: string) => {
-    console.log(`Payment method selected: ${paymentMethod}, Total: HK$${totalAmount.toFixed(2)}`);
+  const handleUpdateCartItemQuantity = (productId: string, newQuantity: number) => {
+    setParsedOrderItems(prevItems => {
+      let updatedItems;
+      if (newQuantity <= 0) {
+        updatedItems = prevItems.filter(item => item.productId !== productId);
+      } else {
+        updatedItems = prevItems.map(item =>
+          item.productId === productId ? { ...item, quantity: newQuantity } : item
+        );
+      }
+      setTotalAmount(recalculateTotal(updatedItems));
+      return updatedItems;
+    });
   };
 
+  const handleRemoveCartItem = (productId: string) => {
+    setParsedOrderItems(prevItems => {
+      const updatedItems = prevItems.filter(item => item.productId !== productId);
+      setTotalAmount(recalculateTotal(updatedItems));
+      return updatedItems;
+    });
+    toast({
+      title: "餐點已移除",
+      description: "已從您的訂單中移除該餐點。",
+    });
+  };
+
+  const handlePaymentSelection = (paymentMethod: string) => {
+    // This would typically involve sending the order to a backend
+    console.log(`Payment method selected: ${paymentMethod}, Final Order: `, parsedOrderItems, `Total: HK$${totalAmount.toFixed(2)}`);
+    // Potentially clear the cart after successful payment simulation
+    // setParsedOrderItems([]);
+    // setTotalAmount(0);
+  };
 
   const showOrderSummary = parsedOrderItems.length > 0;
 
   return (
     <div className="space-y-12">
       <OrderForm onOrderSubmit={handleOrderSubmit} isProcessing={isProcessingOrder} />
+      
+      {isProcessingOrder && (
+         <div className="text-center py-8">
+            <p className="text-lg text-muted-foreground animate-pulse">AI正在努力為您分析訂單...</p>
+         </div>
+      )}
+
+      {showAiConfirmation && aiSuggestedItems.length > 0 && (
+        <Card className="mt-8 shadow-lg border-primary animate-subtle-appear">
+          <CardHeader>
+            <CardTitle className="font-headline text-2xl text-primary flex items-center">
+              <Edit3 className="w-7 h-7 mr-3 text-accent" />
+              AI 為您建議的訂單
+            </CardTitle>
+            <CardDescription>
+              這是AI根據您的描述理解的內容。請確認是否正確，或取消以重新輸入。
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {aiSuggestedItems.map((item, index) => (
+              <div key={index} className="p-3 border rounded-md bg-muted/50">
+                <p className="font-semibold text-foreground">{item.item} <span className="text-sm text-muted-foreground">(數量: {item.quantity})</span></p>
+                {item.specialRequests && <p className="text-xs text-primary">特別要求: {item.specialRequests}</p>}
+              </div>
+            ))}
+          </CardContent>
+          <CardFooter className="flex flex-col sm:flex-row justify-end gap-3">
+            <Button variant="outline" onClick={handleCancelAiSuggestions} className="w-full sm:w-auto">
+              <X className="mr-2 h-4 w-4" />
+              取消並重新輸入
+            </Button>
+            <Button onClick={handleConfirmAiSuggestions} className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white">
+              <Check className="mr-2 h-4 w-4" />
+              確認並加入訂單
+            </Button>
+          </CardFooter>
+        </Card>
+      )}
 
       <Separator />
 
@@ -159,28 +257,26 @@ export default function HomePage() {
         allProducts={mockProducts} 
         onProductAddToCart={handleAddToCartFromManualSelection} 
       />
-
-      {isProcessingOrder && !showOrderSummary && (
-         <div className="text-center py-8">
-            <p className="text-lg text-muted-foreground animate-pulse">AI正在努力為您分析訂單...</p>
-         </div>
-      )}
       
       {showOrderSummary && (
         <>
           <Separator className="my-8 border-2 border-dashed border-primary/50" />
-          <OrderSummaryDisplay items={parsedOrderItems} totalAmount={totalAmount} />
+          <OrderSummaryDisplay 
+            items={parsedOrderItems} 
+            totalAmount={totalAmount}
+            onUpdateQuantity={handleUpdateCartItemQuantity}
+            onRemoveItem={handleRemoveCartItem}
+          />
           <PaymentSelector onPaymentSelect={handlePaymentSelection} totalAmount={totalAmount} />
         </>
       )}
       
-      {!isProcessingOrder && orderAttempted && !showOrderSummary && (
+      {!isProcessingOrder && orderAttempted && !showAiConfirmation && !showOrderSummary && (
          <Alert variant="destructive" className="mt-8">
            <AlertCircle className="h-5 w-5" />
-           <AlertTitle className="font-headline">訂單為空或未找到產品</AlertTitle>
+           <AlertTitle className="font-headline">訂單為空</AlertTitle>
            <AlertDescription>
-             我們無法找到您訂單中的產品，或購物車目前是空的。
-             請嘗試重新描述您的AI訂單，或使用手動選擇餐點功能。
+             您的購物車目前是空的。請嘗試 AI 點餐或使用手動選擇餐點功能。
            </AlertDescription>
          </Alert>
       )}
