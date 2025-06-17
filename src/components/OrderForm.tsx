@@ -45,7 +45,7 @@ const OrderForm: React.FC<OrderFormProps> = ({ onOrderSubmit, isProcessing }) =>
           開始點餐
         </CardTitle>
         <CardDescription className="text-lg">
-          請告訴我們您想點什麼！您可以在下方輸入您的訂單。例如：「我想要兩個芝士漢堡加雙份酸黃瓜，一份大薯條和一杯可樂。」
+          請告訴我們您想點什麼！您可以在下方輸入您的訂單。例如：「我想要兩個仙草3號，一份葡撻雞蛋仔和一杯手打香水檸檬茶。」
         </CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit}>
