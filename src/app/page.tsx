@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from 'react';
+import { useState, useRef } from 'react'; // Added useRef
 import { parseOrder } from '@/ai/flows/parse-order.ts';
 import type { ParseOrderOutput, ParsedAiOrderItem } from '@/ai/flows/parse-order.ts';
 import type { CartItem, Product } from '@/types';
@@ -28,6 +28,8 @@ export default function HomePage() {
   const [aiSuggestedItems, setAiSuggestedItems] = useState<ParsedAiOrderItem[]>([]);
   const [showAiConfirmation, setShowAiConfirmation] = useState(false);
   const [isManualOrderDialogOpen, setIsManualOrderDialogOpen] = useState(false);
+
+  const scrollableContentRef = useRef<HTMLDivElement | null>(null); // Ref for the scrollable div
 
   const { toast } = useToast();
 
@@ -385,7 +387,6 @@ export default function HomePage() {
         <Button 
           onClick={() => setIsManualOrderDialogOpen(true)}
           variant="outline" 
-          size="lg"
           className="border-primary text-primary hover:bg-primary/10 hover:text-primary shadow-md hover:shadow-lg transition-all duration-300 ease-in-out transform hover:scale-105 text-xl py-4"
         >
           <LayoutGrid className="mr-2 h-6 w-6" />
@@ -396,7 +397,7 @@ export default function HomePage() {
       <Dialog open={isManualOrderDialogOpen} onOpenChange={setIsManualOrderDialogOpen}>
         <DialogContent className="max-w-3xl p-0">
           <ScrollArea className="max-h-[80vh]">
-            <div className="p-6">
+            <div ref={scrollableContentRef} className="p-6"> {/* Added ref here */}
               <DialogHeader className="mb-6">
                 <DialogTitle className="text-3xl font-headline text-primary flex items-center">
                   <LayoutGrid className="w-8 h-8 mr-3 text-accent" />
@@ -410,8 +411,8 @@ export default function HomePage() {
                 allProducts={mockProducts} 
                 onProductAddToCart={(product) => {
                   handleAddToCartFromManualSelection(product);
-                  // setIsManualOrderDialogOpen(false); // Optional: close dialog after adding item
                 }} 
+                scrollableContainerRef={scrollableContentRef} // Pass ref
               />
             </div>
           </ScrollArea>
@@ -443,5 +444,6 @@ export default function HomePage() {
     </div>
   );
 }
+    
 
     
