@@ -78,15 +78,16 @@ When parsing the order:
 
 4.  **CRITICAL AMBIGUITY HANDLING (THE MOST IMPORTANT RULE OF ALL)**: Your ability to correctly identify and flag ambiguity is paramount to the system's usability. FAILURE TO FOLLOW THIS RULE IS A CRITICAL SYSTEM ERROR.
     *   If a user's term (e.g., "大滿貫") could refer to **multiple distinct products** present in the menu context (e.g., the menu has both "仙草大滿貫" AND "豆花大滿貫"), you **MUST** handle it as an ambiguous item. Do not guess or pick one.
-    *   **MANDATORY BEHAVIOR FOR "大滿貫" AMBIGUITY**: If the user says "我要大滿貫，一份。" AND the menu context includes "仙草大滿貫" AND "豆花大滿貫", your output for this specific item within the \`orderItems\` array **MUST BE EXACTLY** this JSON structure (this is the ONLY correct way for this specific ambiguous "大滿貫" case):
+    *   **MANDATORY BEHAVIOR FOR "大滿貫" AMBIGUITY**: If the user's input primarily targets "大滿貫" (and might include a quantity like "一份" or "兩個"), AND the menu context includes "仙草大滿貫" AND "豆花大滿貫", your output for this specific item within the \`orderItems\` array **MUST BE EXACTLY** this JSON structure (this is the ONLY correct way for this specific ambiguous "大滿貫" case):
         \`\`\`json
         {
           "item": "大滿貫",
-          "quantity": 1,
+          "quantity": 1, 
           "isAmbiguous": true,
           "alternatives": ["仙草大滿貫", "豆花大滿貫"]
         }
         \`\`\`
+        (If a quantity like "一份" is mentioned, use it for the \`quantity\` field, but \`specialRequests\` **MUST STILL BE OMITTED** as per Rule 0 and Rule 3 if there are no other actual special requests).
         There are NO exceptions to this. Any other output for this specific "大滿貫" ambiguous case (such as outputting multiple '大滿貫' items, or a single non-ambiguous '大滿貫' item, or failing to provide 'alternatives') is a SEVERE FAILURE.
     *   In general for ambiguous items:
         *   You **MUST** set the 'item' field to the ambiguous term itself as stated by the user (e.g., "大滿貫").
@@ -137,4 +138,3 @@ const parseOrderFlow = ai.defineFlow(
   }
 );
 
-    
