@@ -79,20 +79,11 @@ export default function AdminProductsPage() {
       setIsLoading(true);
       try {
         const productsCol = collection(db, 'products');
-        // You might want to add orderBy('category') or orderBy('name') if needed,
-        // ensure you have corresponding indexes in Firestore.
         const productsSnapshot = await getDocs(query(productsCol));
         const fetchedProducts: Product[] = productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
-
-        if (fetchedProducts.length === 0) {
-          // Use mockProducts as fallback if Firestore is empty or not set up
-          // console.warn("Firestore 'products' collection is empty or not found. Falling back to mock products for admin categories.");
-          // For now, we won't use mockProducts as a fallback to clearly show when Firestore data is missing.
-          // The user should populate Firestore via an admin UI (to be built).
-        }
         
         const categoriesMap = fetchedProducts.reduce((acc, product) => {
-          if (!product.category) return acc; // Skip products without a category
+          if (!product.category) return acc; 
           if (!acc[product.category]) {
             acc[product.category] = 0;
           }
@@ -113,8 +104,6 @@ export default function AdminProductsPage() {
           description: "無法從資料庫讀取產品系列。請檢查您的 Firebase 設定或網絡連線。",
           variant: "destructive",
         });
-        // Optionally, load mock data as a fallback or show an error state
-        // setOrderedCategories([]); // Or load mock categories
       } finally {
         setIsLoading(false);
       }
@@ -136,8 +125,6 @@ export default function AdminProductsPage() {
       setOrderedCategories((items) => {
         const oldIndex = items.findIndex((item) => item.id === active.id);
         const newIndex = items.findIndex((item) => item.id === over.id);
-        // Note: This reordering is client-side only. 
-        // For persistence, you'd need to update Firestore.
         return arrayMove(items, oldIndex, newIndex);
       });
     }
@@ -156,9 +143,9 @@ export default function AdminProductsPage() {
           </p>
         </div>
         <Button variant="default" size="lg" asChild className="shadow-md hover:shadow-lg transition-shadow transform hover:scale-105">
-          <Link href="#">
+          <Link href="/admin/products/add">
             <PlusCircle className="mr-2 h-5 w-5" />
-            新增產品 (即將推出)
+            新增產品
           </Link>
         </Button>
       </div>
