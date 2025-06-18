@@ -84,7 +84,7 @@ export default function AdminProductsPage() {
   const [orderedCategories, setOrderedCategories] = useState<CategoryEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSeeding, setIsSeeding] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0); // For triggering data refetch
+  const [refreshKey, setRefreshKey] = useState(0);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -116,7 +116,7 @@ export default function AdminProductsPage() {
         console.error("Error fetching products from Firestore:", error);
         toast({
           title: "讀取產品資料失敗",
-          description: "無法從資料庫讀取產品系列。請檢查您的 Firebase 設定或網絡連線，以及 Firestore 安全性規則。",
+          description: "無法從資料庫讀取產品系列。請檢查您的 Firebase 設定、Firestore 安全性規則或網絡連線。",
           variant: "destructive",
         });
       } finally {
@@ -154,8 +154,7 @@ export default function AdminProductsPage() {
     });
 
     try {
-      const productsColRef = collection(db, 'products');
-      const batchSize = 400; // Firestore batch limit is 500 operations
+      const batchSize = 400; 
       let productsAddedCount = 0;
 
       for (let i = 0; i < mockProducts.length; i += batchSize) {
@@ -171,7 +170,6 @@ export default function AdminProductsPage() {
             imageUrl: product.imageUrl || `https://placehold.co/300x200.png?text=${encodeURIComponent(product.name)}`,
             'data-ai-hint': product['data-ai-hint'] || 'food item',
           };
-          // For auto-generated ID, pass the collection reference to doc()
           const newDocRef = doc(collection(db, 'products'));
           batch.set(newDocRef, productData);
         });
@@ -186,15 +184,16 @@ export default function AdminProductsPage() {
         variant: "default",
         className: "bg-green-500 text-white border-green-600",
       });
-      setRefreshKey(prevKey => prevKey + 1); // Trigger data refresh
+      setRefreshKey(prevKey => prevKey + 1);
     } catch (error) {
       console.error("Error seeding database:", error);
       toast({
         title: "數據導入失敗",
-        description: "導入產品數據到 Firestore 時發生錯誤。請檢查瀏覽器主控台獲取詳細資訊。",
+        description: "導入產品數據到 Firestore 時發生錯誤。請檢查瀏覽器主控台獲取詳細資訊，並確認 Firestore 安全性規則允許寫入。",
         variant: "destructive",
       });
     } finally {
+      console.log("Seeding process finally block reached."); // Diagnostic log
       setIsSeeding(false);
     }
   }, [toast, setIsSeeding, setRefreshKey]);
@@ -230,7 +229,7 @@ export default function AdminProductsPage() {
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>取消</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleSeedDatabase} className="bg-primary hover:bg-primary/90">確認導入</AlertDialogAction>
+                  <AlertDialogAction onClick={handleSeedDatabase} className="bg-primary hover:bg-primary/90" disabled={isSeeding}>確認導入</AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
@@ -298,4 +297,3 @@ export default function AdminProductsPage() {
     </div>
   );
 }
-
