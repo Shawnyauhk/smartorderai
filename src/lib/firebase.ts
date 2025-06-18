@@ -12,6 +12,9 @@ const firebaseConfig: FirebaseOptions = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
+// Diagnostic log: Print the config to the browser console
+console.log("Firebase Config Loaded by Client:", firebaseConfig);
+
 // Initialize Firebase
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const db = getFirestore(app);
