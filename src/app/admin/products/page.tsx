@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -86,15 +86,15 @@ export default function AdminProductsPage() {
   const [isSeeding, setIsSeeding] = useState(false);
   const { toast } = useToast();
 
-  const fetchProductsAndSetCategories = async () => {
+  const fetchProductsAndSetCategories = useCallback(async () => {
     setIsLoading(true);
     try {
       const productsCol = collection(db, 'products');
-      const productsSnapshot = await getDocs(query(productsCol)); 
+      const productsSnapshot = await getDocs(query(productsCol));
       const fetchedProducts: Product[] = productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
-      
+
       const categoriesMap = fetchedProducts.reduce((acc, product) => {
-        if (!product.category) return acc; 
+        if (!product.category) return acc;
         if (!acc[product.category]) {
           acc[product.category] = 0;
         }
@@ -104,8 +104,8 @@ export default function AdminProductsPage() {
 
       const initialCategories = Object.entries(categoriesMap)
         .map(([name, count]) => ({ id: name, name, count }))
-        .sort((a, b) => a.name.localeCompare(b.name, 'zh-HK')); 
-      
+        .sort((a, b) => a.name.localeCompare(b.name, 'zh-HK'));
+
       setOrderedCategories(initialCategories);
 
     } catch (error) {
@@ -118,12 +118,12 @@ export default function AdminProductsPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [toast]); // Dependencies: toast, (setIsLoading, setOrderedCategories are stable state setters)
 
   useEffect(() => {
     document.title = "產品系列 - 智能點餐AI";
     fetchProductsAndSetCategories();
-  }, []); 
+  }, [fetchProductsAndSetCategories]);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -143,7 +143,7 @@ export default function AdminProductsPage() {
     }
   }
 
-  const handleSeedDatabase = async () => {
+  const handleSeedDatabase = useCallback(async () => {
     setIsSeeding(true);
     toast({
       title: "開始導入數據...",
@@ -152,13 +152,13 @@ export default function AdminProductsPage() {
 
     try {
       const productsColRef = collection(db, 'products');
-      const batchSize = 400; 
+      const batchSize = 400;
       let productsAddedCount = 0;
 
       for (let i = 0; i < mockProducts.length; i += batchSize) {
         const batch = writeBatch(db);
         const chunk = mockProducts.slice(i, i + batchSize);
-        
+
         chunk.forEach(product => {
           const productData = {
             name: product.name,
@@ -171,7 +171,7 @@ export default function AdminProductsPage() {
           const newDocRef = doc(productsColRef); // Auto-generate ID for new document
           batch.set(newDocRef, productData);
         });
-        
+
         await batch.commit();
         productsAddedCount += chunk.length;
       }
@@ -182,7 +182,7 @@ export default function AdminProductsPage() {
         variant: "default",
         className: "bg-green-500 text-white border-green-600",
       });
-      await fetchProductsAndSetCategories(); 
+      await fetchProductsAndSetCategories();
     } catch (error) {
       console.error("Error seeding database:", error);
       toast({
@@ -193,7 +193,7 @@ export default function AdminProductsPage() {
     } finally {
       setIsSeeding(false);
     }
-  };
+  }, [toast, fetchProductsAndSetCategories]); // Dependencies: toast, fetchProductsAndSetCategories (setIsSeeding is stable)
 
   return (
     <div className="space-y-8">
@@ -210,7 +210,7 @@ export default function AdminProductsPage() {
         <div className="flex flex-col sm:flex-row gap-2 items-stretch">
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="outline" className="border-accent text-accent hover:bg-accent/10 hover:text-accent shadow-md hover:shadow-lg transition-shadow" disabled={isSeeding}>
+                <Button variant="outline" className="border-accent text-accent hover:bg-accent/10 hover:text-accent shadow-md hover:shadow-lg transition-shadow" disabled={isSeeding || isLoading}>
                   {isSeeding ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <DatabaseZap className="mr-2 h-5 w-5" />}
                   {isSeeding ? "導入中..." : "從模擬數據導入產品"}
                 </Button>
@@ -231,7 +231,7 @@ export default function AdminProductsPage() {
               </AlertDialogContent>
             </AlertDialog>
 
-            <Button variant="default" size="lg" asChild className="shadow-md hover:shadow-lg transition-shadow transform hover:scale-105">
+            <Button variant="default" size="lg" asChild className="shadow-md hover:shadow-lg transition-shadow transform hover:scale-105" disabled={isLoading}>
             <Link href="/admin/products/add">
                 <PlusCircle className="mr-2 h-5 w-5" />
                 新增產品
@@ -239,12 +239,13 @@ export default function AdminProductsPage() {
             </Button>
         </div>
       </div>
-      
+
       <Separator />
 
       {isLoading ? (
         <div className="text-center py-12">
-          <p className="text-xl text-muted-foreground animate-pulse">正在載入產品系列...</p>
+          <Loader2 className="mx-auto h-12 w-12 text-primary animate-spin mb-4" />
+          <p className="text-xl text-muted-foreground">正在載入產品系列...</p>
         </div>
       ) : orderedCategories.length > 0 ? (
         <DndContext
@@ -260,8 +261,8 @@ export default function AdminProductsPage() {
               {orderedCategories.map((categoryItem) => (
                 <SortableCategoryCard key={categoryItem.id} categoryItem={categoryItem}>
                   <Card className="h-full flex flex-col justify-between hover:shadow-lg transition-shadow duration-300 ease-in-out transform hover:-translate-y-1">
-                    <Link 
-                      href={`/admin/products/${encodeURIComponent(categoryItem.name)}`} 
+                    <Link
+                      href={`/admin/products/${encodeURIComponent(categoryItem.name)}`}
                       className="block hover:no-underline flex-grow p-1"
                     >
                         <CardHeader>
@@ -277,9 +278,12 @@ export default function AdminProductsPage() {
         </DndContext>
       ) : (
         <div className="text-center py-12">
-          <p className="text-xl text-muted-foreground">未找到任何產品系列。</p>
-          <p className="mt-2 text-foreground">
-            您可以先透過「新增產品」功能加入產品，或使用「從模擬數據導入產品」按鈕來快速填充產品庫。
+          <DatabaseZap className="mx-auto h-16 w-16 text-muted-foreground mb-6" />
+          <p className="text-xl font-headline text-primary mb-2">未找到任何產品系列</p>
+          <p className="mt-2 text-foreground max-w-md mx-auto">
+            您的產品庫目前是空的。您可以透過「新增產品」按鈕手動加入產品，或使用「從模擬數據導入產品」功能來快速填充產品庫。
+          </p>
+           <p className="text-xs text-muted-foreground mt-4">
             如果已導入或新增但仍未顯示，請檢查您的Firebase設定、Firestore安全性規則和資料庫連線。
           </p>
         </div>
@@ -290,4 +294,3 @@ export default function AdminProductsPage() {
     </div>
   );
 }
-
