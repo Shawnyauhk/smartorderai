@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { PlusCircle, FolderKanban, GripVertical, DatabaseZap, Loader2 } from 'lucide-react';
+import { PlusCircle, FolderKanban, GripVertical, DatabaseZap, Loader2, BrainCircuit } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import type { Product } from '@/types';
 import {
@@ -84,7 +84,7 @@ export default function AdminProductsPage() {
   const [orderedCategories, setOrderedCategories] = useState<CategoryEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSeeding, setIsSeeding] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [refreshKey, setRefreshKey] = useState(0); // Used to trigger re-fetch
   const { toast } = useToast();
 
   useEffect(() => {
@@ -94,11 +94,12 @@ export default function AdminProductsPage() {
       setIsLoading(true);
       try {
         const productsCol = collection(db, 'products');
+        // Consider adding orderBy and appropriate indexing in Firestore for consistent ordering
         const productsSnapshot = await getDocs(query(productsCol));
         const fetchedProducts: Product[] = productsSnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Product));
 
         const categoriesMap = fetchedProducts.reduce((acc, product) => {
-          if (!product.category) return acc;
+          if (!product.category) return acc; // Skip products without a category
           if (!acc[product.category]) {
             acc[product.category] = 0;
           }
@@ -108,7 +109,7 @@ export default function AdminProductsPage() {
 
         const initialCategories = Object.entries(categoriesMap)
           .map(([name, count]) => ({ id: name, name, count }))
-          .sort((a, b) => a.name.localeCompare(b.name, 'zh-HK'));
+          .sort((a, b) => a.name.localeCompare(b.name, 'zh-HK')); // Sort by name
 
         setOrderedCategories(initialCategories);
 
@@ -125,7 +126,7 @@ export default function AdminProductsPage() {
     };
 
     loadData();
-  }, [toast, refreshKey, setIsLoading, setOrderedCategories]);
+  }, [toast, refreshKey, setIsLoading, setOrderedCategories]); // refreshKey added as dependency
 
 
   const sensors = useSensors(
@@ -141,6 +142,8 @@ export default function AdminProductsPage() {
       setOrderedCategories((items) => {
         const oldIndex = items.findIndex((item) => item.id === active.id);
         const newIndex = items.findIndex((item) => item.id === over.id);
+        // Note: This reordering is client-side only.
+        // For persistence, you'd need to update Firestore with an 'order' field or similar.
         return arrayMove(items, oldIndex, newIndex);
       });
     }
@@ -154,7 +157,7 @@ export default function AdminProductsPage() {
     });
 
     try {
-      const batchSize = 400; 
+      const batchSize = 400; // Firestore batch limit is 500 operations
       let productsAddedCount = 0;
 
       for (let i = 0; i < mockProducts.length; i += batchSize) {
@@ -170,6 +173,7 @@ export default function AdminProductsPage() {
             imageUrl: product.imageUrl || `https://placehold.co/300x200.png?text=${encodeURIComponent(product.name)}`,
             'data-ai-hint': product['data-ai-hint'] || 'food item',
           };
+          // Generate a new document reference with an auto-generated ID
           const newDocRef = doc(collection(db, 'products'));
           batch.set(newDocRef, productData);
         });
@@ -184,7 +188,7 @@ export default function AdminProductsPage() {
         variant: "default",
         className: "bg-green-500 text-white border-green-600",
       });
-      setRefreshKey(prevKey => prevKey + 1);
+      setRefreshKey(prevKey => prevKey + 1); // Trigger data refresh
     } catch (error) {
       console.error("Error seeding database:", error);
       toast({
@@ -211,6 +215,12 @@ export default function AdminProductsPage() {
           </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 items-stretch">
+             <Button variant="outline" asChild className="border-purple-500 text-purple-600 hover:bg-purple-500/10 hover:text-purple-700 shadow-md hover:shadow-lg transition-shadow" disabled={isLoading}>
+                <Link href="/admin/products/import-image">
+                    <BrainCircuit className="mr-2 h-5 w-5" />
+                    從圖片導入 (AI)
+                </Link>
+            </Button>
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="outline" className="border-accent text-accent hover:bg-accent/10 hover:text-accent shadow-md hover:shadow-lg transition-shadow" disabled={isSeeding || isLoading}>
@@ -266,7 +276,7 @@ export default function AdminProductsPage() {
                   <Card className="h-full flex flex-col justify-between hover:shadow-lg transition-shadow duration-300 ease-in-out transform hover:-translate-y-1">
                     <Link
                       href={`/admin/products/${encodeURIComponent(categoryItem.name)}`}
-                      className="block hover:no-underline flex-grow p-1"
+                      className="block hover:no-underline flex-grow p-1" // Ensure link covers card
                     >
                         <CardHeader>
                           <CardTitle className="text-2xl font-headline text-primary">{categoryItem.name}</CardTitle>
@@ -297,3 +307,4 @@ export default function AdminProductsPage() {
     </div>
   );
 }
+
