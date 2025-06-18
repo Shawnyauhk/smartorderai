@@ -11,7 +11,7 @@ const firebaseConfig: FirebaseOptions = {
   storageBucket: "smartorder-ai.firebasestorage.app",
   messagingSenderId: "32582129627",
   appId: "1:32582129627:web:96097f9a652bdfc066f9fe"
-  // measurementId is not included as it wasn't in the provided config.
+  // measurementId is intentionally omitted as it wasn't in the latest provided config.
 };
 
 // Diagnostic log: Print the config to the browser console
