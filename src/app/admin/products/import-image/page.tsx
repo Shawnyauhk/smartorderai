@@ -135,21 +135,23 @@ export default function ImportProductsFromImagePage() {
       extractedData.extractedProducts.forEach((extractedProduct: ExtractedProduct) => {
         const newProductRef = doc(productsCollection); // Auto-generate ID
 
-        // Create a default data-ai-hint from name (first two words) or category, or fallback
         let defaultAiHint = 'food item';
-        if (extractedProduct.name) {
-            defaultAiHint = extractedProduct.name.split(/\s+/).slice(0, 2).join(' ').toLowerCase();
-        } else if (extractedProduct.category) {
-            defaultAiHint = extractedProduct.category.split(/\s+/).slice(0, 2).join(' ').toLowerCase();
+        const productName = extractedProduct.name || "Unnamed Product"; // Fallback for name
+        const productCategory = extractedProduct.category || "Uncategorized"; // Fallback for category
+
+        if (productName !== "Unnamed Product") {
+            defaultAiHint = productName.split(/\s+/).slice(0, 2).join(' ').toLowerCase();
+        } else if (productCategory !== "Uncategorized") {
+            defaultAiHint = productCategory.split(/\s+/).slice(0, 2).join(' ').toLowerCase();
         }
         
         const productData: Product = {
-          id: newProductRef.id, // Store the auto-generated ID if needed, though Firestore handles it
-          name: extractedProduct.name,
+          id: newProductRef.id,
+          name: productName,
           price: typeof extractedProduct.price === 'number' ? extractedProduct.price : 0,
-          category: extractedProduct.category || '未分類',
+          category: productCategory,
           description: extractedProduct.description || '',
-          imageUrl: `https://placehold.co/300x200.png?text=${encodeURIComponent(extractedProduct.name)}`,
+          imageUrl: `https://placehold.co/300x200.png?text=${encodeURIComponent(productName)}`,
           'data-ai-hint': defaultAiHint,
         };
         batch.set(newProductRef, productData);
@@ -161,8 +163,8 @@ export default function ImportProductsFromImagePage() {
         description: `已成功將 ${extractedData.extractedProducts.length} 項產品儲存到資料庫。`,
         className: "bg-green-500 text-white border-green-600",
       });
-      setExtractedData(null); // Clear the data after saving
-      router.push('/admin/products'); // Navigate to product list page
+      setExtractedData(null); 
+      router.push('/admin/products'); 
 
     } catch (error) {
       console.error("Error saving products to Firestore:", error);
@@ -172,6 +174,7 @@ export default function ImportProductsFromImagePage() {
         variant: "destructive",
       });
     } finally {
+      console.log("Save to DB 'finally' block reached. isSaving should be set to false.");
       setIsSaving(false);
     }
   };
@@ -306,5 +309,4 @@ export default function ImportProductsFromImagePage() {
     </div>
   );
 }
-
     
