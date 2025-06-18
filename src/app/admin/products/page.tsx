@@ -84,46 +84,49 @@ export default function AdminProductsPage() {
   const [orderedCategories, setOrderedCategories] = useState<CategoryEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSeeding, setIsSeeding] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0); // For triggering data refetch
   const { toast } = useToast();
-
-  const fetchProductsAndSetCategories = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const productsCol = collection(db, 'products');
-      const productsSnapshot = await getDocs(query(productsCol));
-      const fetchedProducts: Product[] = productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
-
-      const categoriesMap = fetchedProducts.reduce((acc, product) => {
-        if (!product.category) return acc;
-        if (!acc[product.category]) {
-          acc[product.category] = 0;
-        }
-        acc[product.category]++;
-        return acc;
-      }, {} as Record<string, number>);
-
-      const initialCategories = Object.entries(categoriesMap)
-        .map(([name, count]) => ({ id: name, name, count }))
-        .sort((a, b) => a.name.localeCompare(b.name, 'zh-HK'));
-
-      setOrderedCategories(initialCategories);
-
-    } catch (error) {
-      console.error("Error fetching products from Firestore:", error);
-      toast({
-        title: "讀取產品資料失敗",
-        description: "無法從資料庫讀取產品系列。請檢查您的 Firebase 設定或網絡連線，以及 Firestore 安全性規則。",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [toast]); // Dependencies: toast, (setIsLoading, setOrderedCategories are stable state setters)
 
   useEffect(() => {
     document.title = "產品系列 - 智能點餐AI";
-    fetchProductsAndSetCategories();
-  }, [fetchProductsAndSetCategories]);
+
+    const loadData = async () => {
+      setIsLoading(true);
+      try {
+        const productsCol = collection(db, 'products');
+        const productsSnapshot = await getDocs(query(productsCol));
+        const fetchedProducts: Product[] = productsSnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Product));
+
+        const categoriesMap = fetchedProducts.reduce((acc, product) => {
+          if (!product.category) return acc;
+          if (!acc[product.category]) {
+            acc[product.category] = 0;
+          }
+          acc[product.category]++;
+          return acc;
+        }, {} as Record<string, number>);
+
+        const initialCategories = Object.entries(categoriesMap)
+          .map(([name, count]) => ({ id: name, name, count }))
+          .sort((a, b) => a.name.localeCompare(b.name, 'zh-HK'));
+
+        setOrderedCategories(initialCategories);
+
+      } catch (error) {
+        console.error("Error fetching products from Firestore:", error);
+        toast({
+          title: "讀取產品資料失敗",
+          description: "無法從資料庫讀取產品系列。請檢查您的 Firebase 設定或網絡連線，以及 Firestore 安全性規則。",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadData();
+  }, [toast, refreshKey, setIsLoading, setOrderedCategories]);
+
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -152,7 +155,7 @@ export default function AdminProductsPage() {
 
     try {
       const productsColRef = collection(db, 'products');
-      const batchSize = 400;
+      const batchSize = 400; // Firestore batch limit is 500 operations
       let productsAddedCount = 0;
 
       for (let i = 0; i < mockProducts.length; i += batchSize) {
@@ -168,7 +171,8 @@ export default function AdminProductsPage() {
             imageUrl: product.imageUrl || `https://placehold.co/300x200.png?text=${encodeURIComponent(product.name)}`,
             'data-ai-hint': product['data-ai-hint'] || 'food item',
           };
-          const newDocRef = doc(productsColRef); // Auto-generate ID for new document
+          // For auto-generated ID, pass the collection reference to doc()
+          const newDocRef = doc(collection(db, 'products'));
           batch.set(newDocRef, productData);
         });
 
@@ -182,7 +186,7 @@ export default function AdminProductsPage() {
         variant: "default",
         className: "bg-green-500 text-white border-green-600",
       });
-      await fetchProductsAndSetCategories();
+      setRefreshKey(prevKey => prevKey + 1); // Trigger data refresh
     } catch (error) {
       console.error("Error seeding database:", error);
       toast({
@@ -193,7 +197,7 @@ export default function AdminProductsPage() {
     } finally {
       setIsSeeding(false);
     }
-  }, [toast, fetchProductsAndSetCategories]); // Dependencies: toast, fetchProductsAndSetCategories (setIsSeeding is stable)
+  }, [toast, setIsSeeding, setRefreshKey]);
 
   return (
     <div className="space-y-8">
@@ -294,3 +298,4 @@ export default function AdminProductsPage() {
     </div>
   );
 }
+
