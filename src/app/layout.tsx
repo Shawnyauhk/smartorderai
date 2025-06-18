@@ -1,7 +1,9 @@
+
 import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import Navbar from '@/components/Navbar';
+import CurrentYear from '@/components/CurrentYear'; // Import the new component
 
 export const metadata: Metadata = {
   title: '智能點餐AI',
@@ -32,7 +34,7 @@ export default function RootLayout({
         </main>
         <Toaster />
         <footer className="text-center p-4 text-sm text-muted-foreground">
-          © {new Date().getFullYear()} 智能點餐AI. 版權所有.
+          © <CurrentYear /> 智能點餐AI. 版權所有.
         </footer>
       </body>
     </html>
