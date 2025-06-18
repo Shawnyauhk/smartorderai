@@ -2,7 +2,6 @@
 "use client";
 
 import { use, useState, useEffect } from 'react';
-import { mockProducts } from '@/lib/product-data';
 import ProductCard from '@/components/ProductCard';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
@@ -16,7 +15,7 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
-  DragEndEvent,
+  type DragEndEvent,
 } from '@dnd-kit/core';
 import {
   arrayMove,
@@ -26,6 +25,9 @@ import {
   rectSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { useToast } from '@/hooks/use-toast';
 
 type Props = {
   params: Promise<{ category: string }>;
@@ -71,14 +73,37 @@ export default function CategoryProductsPage({ params: paramsPromise }: Props) {
   const params = use(paramsPromise);
   const decodedCategory = decodeURIComponent(params.category);
   const [orderedProducts, setOrderedProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
-    const productsInCategory = mockProducts.filter(
-      (product) => product.category === decodedCategory
-    );
-    setOrderedProducts(productsInCategory);
     document.title = `${decodedCategory} - 產品列表 - 智能點餐AI`;
-  }, [decodedCategory]);
+    const fetchProducts = async () => {
+      if (!decodedCategory) return;
+      setIsLoading(true);
+      try {
+        const productsCol = collection(db, 'products');
+        const q = query(productsCol, where('category', '==', decodedCategory), orderBy('name')); // Example: order by name
+        const productsSnapshot = await getDocs(q);
+        const fetchedProducts: Product[] = productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
+        
+        setOrderedProducts(fetchedProducts);
+
+      } catch (error) {
+        console.error(`Error fetching products for category ${decodedCategory}:`, error);
+        toast({
+          title: "讀取產品失敗",
+          description: `無法從資料庫讀取 ${decodedCategory} 系列的產品。請檢查您的 Firebase 設定或網絡連線。`,
+          variant: "destructive",
+        });
+        // setOrderedProducts([]); // Or fallback to mock data if necessary
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, [decodedCategory, toast]);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -94,6 +119,8 @@ export default function CategoryProductsPage({ params: paramsPromise }: Props) {
       setOrderedProducts((items) => {
         const oldIndex = items.findIndex((item) => item.id === active.id);
         const newIndex = items.findIndex((item) => item.id === over.id);
+        // Note: This reordering is client-side only.
+        // For persistence, you'd need to update Firestore.
         return arrayMove(items, oldIndex, newIndex);
       });
     }
@@ -121,7 +148,11 @@ export default function CategoryProductsPage({ params: paramsPromise }: Props) {
       
       <Separator />
 
-      {orderedProducts.length > 0 ? (
+      {isLoading ? (
+         <div className="text-center py-12">
+            <p className="text-xl text-muted-foreground animate-pulse">正在載入 {decodedCategory} 產品...</p>
+         </div>
+      ) : orderedProducts.length > 0 ? (
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
@@ -141,10 +172,11 @@ export default function CategoryProductsPage({ params: paramsPromise }: Props) {
       ) : (
         <div className="text-center py-12">
           <p className="text-xl text-muted-foreground">在此系列中未找到任何產品。</p>
+          <p className="mt-2 text-foreground">請先透過「新增產品」功能加入產品到此系列，或檢查您的Firebase設定和資料庫連線。</p>
         </div>
       )}
       <p className="text-sm text-muted-foreground mt-4 text-center">
-        提示：目前的排序僅在當前頁面有效，刷新後將重置。
+        提示：目前的排序僅在當前頁面有效，刷新後將重置。如需永久儲存排序，需後續開發。
       </p>
     </div>
   );
