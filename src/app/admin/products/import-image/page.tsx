@@ -3,27 +3,33 @@
 
 import type React from 'react';
 import { useState, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeftCircle, UploadCloud, BrainCircuit, Loader2, FileJson } from 'lucide-react';
+import { ArrowLeftCircle, UploadCloud, BrainCircuit, Loader2, FileJson, Save } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { extractProductsFromImage } from '@/ai/flows/extract-products-from-image-flow';
 import type { ExtractProductsOutput, ExtractedProduct } from '@/ai/flows/extract-products-from-image-flow';
+import { collection, writeBatch, doc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import type { Product } from '@/types';
 
 export default function ImportProductsFromImagePage() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [customPrompt, setCustomPrompt] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [extractedData, setExtractedData] = useState<ExtractProductsOutput | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { toast } = useToast();
+  const router = useRouter();
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -111,8 +117,65 @@ export default function ImportProductsFromImagePage() {
     }
   };
 
-  // In a real app, you'd have a function here to save `extractedData.extractedProducts` to Firestore.
-  // For now, we just display it.
+  const handleSaveToDatabase = async () => {
+    if (!extractedData || extractedData.extractedProducts.length === 0) {
+      toast({
+        title: "沒有可儲存的產品",
+        description: "AI 未提取到任何產品資料，或資料已被清空。",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const batch = writeBatch(db);
+      const productsCollection = collection(db, 'products');
+
+      extractedData.extractedProducts.forEach((extractedProduct: ExtractedProduct) => {
+        const newProductRef = doc(productsCollection); // Auto-generate ID
+
+        // Create a default data-ai-hint from name (first two words) or category, or fallback
+        let defaultAiHint = 'food item';
+        if (extractedProduct.name) {
+            defaultAiHint = extractedProduct.name.split(/\s+/).slice(0, 2).join(' ').toLowerCase();
+        } else if (extractedProduct.category) {
+            defaultAiHint = extractedProduct.category.split(/\s+/).slice(0, 2).join(' ').toLowerCase();
+        }
+        
+        const productData: Product = {
+          id: newProductRef.id, // Store the auto-generated ID if needed, though Firestore handles it
+          name: extractedProduct.name,
+          price: typeof extractedProduct.price === 'number' ? extractedProduct.price : 0,
+          category: extractedProduct.category || '未分類',
+          description: extractedProduct.description || '',
+          imageUrl: `https://placehold.co/300x200.png?text=${encodeURIComponent(extractedProduct.name)}`,
+          'data-ai-hint': defaultAiHint,
+        };
+        batch.set(newProductRef, productData);
+      });
+
+      await batch.commit();
+      toast({
+        title: "儲存成功！",
+        description: `已成功將 ${extractedData.extractedProducts.length} 項產品儲存到資料庫。`,
+        className: "bg-green-500 text-white border-green-600",
+      });
+      setExtractedData(null); // Clear the data after saving
+      router.push('/admin/products'); // Navigate to product list page
+
+    } catch (error) {
+      console.error("Error saving products to Firestore:", error);
+      toast({
+        title: "儲存失敗",
+        description: "儲存產品到資料庫時發生錯誤，請檢查主控台取得更多資訊。",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
 
   return (
     <div className="space-y-8">
@@ -180,7 +243,7 @@ export default function ImportProductsFromImagePage() {
           </div>
         </CardContent>
         <CardFooter>
-          <Button onClick={handleExtract} className="w-full text-lg py-6" disabled={isLoading || !imageFile}>
+          <Button onClick={handleExtract} className="w-full text-lg py-6" disabled={isLoading || !imageFile || isSaving}>
             {isLoading ? (
               <Loader2 className="mr-2 h-6 w-6 animate-spin" />
             ) : (
@@ -200,7 +263,7 @@ export default function ImportProductsFromImagePage() {
             </CardTitle>
             <CardDescription>
               以下是 AI 從圖片中提取的產品資訊。請檢查是否準確。
-              （下一步我們將實現將此處確認的資料儲存到資料庫的功能。）
+              確認無誤後，您可以將這些產品儲存到資料庫。
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -210,8 +273,13 @@ export default function ImportProductsFromImagePage() {
               </pre>
             </div>
             <div className="mt-6 text-center">
-              <Button disabled>
-                確認並儲存到資料庫 (功能待開發)
+              <Button onClick={handleSaveToDatabase} disabled={isSaving || isLoading} className="bg-green-600 hover:bg-green-700 text-white">
+                {isSaving ? (
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                ) : (
+                  <Save className="mr-2 h-5 w-5" />
+                )}
+                {isSaving ? '儲存中...' : `確認並儲存 ${extractedData.extractedProducts.length} 項產品到資料庫`}
               </Button>
             </div>
           </CardContent>
@@ -238,3 +306,5 @@ export default function ImportProductsFromImagePage() {
     </div>
   );
 }
+
+    
