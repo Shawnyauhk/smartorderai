@@ -25,7 +25,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { collection, getDocs, query, addDoc, writeBatch, getCountFromServer } from 'firebase/firestore';
+import { collection, getDocs, query, writeBatch, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { mockProducts } from '@/lib/product-data';
@@ -90,7 +90,7 @@ export default function AdminProductsPage() {
     setIsLoading(true);
     try {
       const productsCol = collection(db, 'products');
-      const productsSnapshot = await getDocs(query(productsCol)); // Removed orderBy temporarily to avoid composite index need
+      const productsSnapshot = await getDocs(query(productsCol)); 
       const fetchedProducts: Product[] = productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
       
       const categoriesMap = fetchedProducts.reduce((acc, product) => {
@@ -123,7 +123,7 @@ export default function AdminProductsPage() {
   useEffect(() => {
     document.title = "產品系列 - 智能點餐AI";
     fetchProductsAndSetCategories();
-  }, [toast]); // Removed fetchProductsAndSetCategories from deps to avoid loop if it's not memoized
+  }, []); 
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -151,9 +151,7 @@ export default function AdminProductsPage() {
     });
 
     try {
-      const productsCol = collection(db, 'products');
-      // Firestore batch writes are limited to 500 operations.
-      // If mockProducts is larger, it needs to be chunked.
+      const productsColRef = collection(db, 'products');
       const batchSize = 400; 
       let productsAddedCount = 0;
 
@@ -170,7 +168,7 @@ export default function AdminProductsPage() {
             imageUrl: product.imageUrl || `https://placehold.co/300x200.png?text=${encodeURIComponent(product.name)}`,
             'data-ai-hint': product['data-ai-hint'] || 'food item',
           };
-          const newDocRef = collection(db, 'products').doc(); // Auto-generate ID
+          const newDocRef = doc(productsColRef); // Auto-generate ID for new document
           batch.set(newDocRef, productData);
         });
         
@@ -184,7 +182,7 @@ export default function AdminProductsPage() {
         variant: "default",
         className: "bg-green-500 text-white border-green-600",
       });
-      await fetchProductsAndSetCategories(); // Refresh categories list
+      await fetchProductsAndSetCategories(); 
     } catch (error) {
       console.error("Error seeding database:", error);
       toast({
