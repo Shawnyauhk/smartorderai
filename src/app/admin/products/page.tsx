@@ -127,6 +127,10 @@ export default function AdminProductsPage() {
   const [newCategoryNameInput, setNewCategoryNameInput] = useState('');
   const [isEditingCategoryName, setIsEditingCategoryName] = useState(false);
 
+  const [isNewCategoryDialogOpen, setIsNewCategoryDialogOpen] = useState(false);
+  const [newCategoryNameForCreation, setNewCategoryNameForCreation] = useState('');
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
+
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -157,6 +161,17 @@ export default function AdminProductsPage() {
         storedOrderedNames = orderDocSnap.data()?.orderedNames || [];
       }
       
+      // Add any new categories from products that are not yet in storedOrderedNames to categoriesMap (with count 0 if necessary)
+      storedOrderedNames.forEach(name => {
+        if (!categoriesMap[name]) {
+          categoriesMap[name] = 0; // Add to map if it was in stored order but has no products
+        }
+      });
+      // Rebuild initialCategories to include categories from storedOrder that might be empty
+       initialCategories = Object.entries(categoriesMap)
+        .map(([name, count]) => ({ id: name, name, count }));
+
+
       initialCategories.sort((a, b) => {
         const indexA = storedOrderedNames.indexOf(a.name);
         const indexB = storedOrderedNames.indexOf(b.name);
@@ -174,10 +189,10 @@ export default function AdminProductsPage() {
       });
       
       const validStoredOrderCategories = storedOrderedNames.map(name => initialCategories.find(cat => cat.name === name)).filter(Boolean) as CategoryEntry[];
-      const newCategories = initialCategories.filter(cat => !storedOrderedNames.includes(cat.name));
-      newCategories.sort((a,b) => a.name.localeCompare(b.name, 'zh-HK'));
+      const newCategoriesNotInStoredOrder = initialCategories.filter(cat => !storedOrderedNames.includes(cat.name));
+      newCategoriesNotInStoredOrder.sort((a,b) => a.name.localeCompare(b.name, 'zh-HK'));
 
-      setOrderedCategories([...validStoredOrderCategories, ...newCategories]);
+      setOrderedCategories([...validStoredOrderCategories, ...newCategoriesNotInStoredOrder]);
 
     } catch (error) {
       console.error("Error fetching products from Firestore:", error);
@@ -246,8 +261,6 @@ export default function AdminProductsPage() {
             description: "儲存系列排列順序時發生錯誤。",
             variant: "destructive",
           });
-          // Optionally revert optimistic update if saving fails, or reload data
-          // For now, we keep the optimistic update and log error.
         }
       }
     }
@@ -276,7 +289,6 @@ export default function AdminProductsPage() {
       
       setOrderedCategories(prev => prev.filter(c => c.id !== categoryToDelete.id));
       
-      // Update stored order
       const orderDocRef = doc(db, CATEGORY_ORDER_COLLECTION, CATEGORY_ORDER_DOC_ID);
       const orderDocSnap = await getDoc(orderDocRef);
       if (orderDocSnap.exists()) {
@@ -328,7 +340,6 @@ export default function AdminProductsPage() {
 
     setIsEditingCategoryName(true);
     const oldCategoryName = categoryToEdit.name;
-    const oldCategoryId = categoryToEdit.id;
 
     try {
       const productsCol = collection(db, 'products');
@@ -345,59 +356,21 @@ export default function AdminProductsPage() {
       
       const orderDocRef = doc(db, CATEGORY_ORDER_COLLECTION, CATEGORY_ORDER_DOC_ID);
       const orderDocSnap = await getDoc(orderDocRef);
+      let newOrderedNames = [];
       if (orderDocSnap.exists()) {
-        let currentOrderedNames = orderDocSnap.data()?.orderedNames || [];
-        const oldNameIndex = currentOrderedNames.indexOf(oldCategoryName);
-        if (oldNameIndex !== -1) {
-          currentOrderedNames[oldNameIndex] = newName;
-          await setDoc(orderDocRef, { orderedNames: currentOrderedNames }, { merge: true });
-        } else { 
-          // If old name wasn't in order, add new one (should ideally not happen if all categories are in order)
-          // This case might occur if a category was added and order not saved yet.
-          // For safety, we re-fetch all categories and sort based on updated order.
-          // Or simply rely on loadData() to re-sort correctly. For now, we just update.
-           currentOrderedNames.push(newName); // Add if it wasn't there
-           await setDoc(orderDocRef, { orderedNames: currentOrderedNames }, { merge: true });
-        }
+        newOrderedNames = (orderDocSnap.data()?.orderedNames || []).map((name: string) => name === oldCategoryName ? newName : name);
       } else {
-         // If order doc doesn't exist, create it with the new name (and potentially others later)
-         await setDoc(orderDocRef, { orderedNames: [newName] }, { merge: true });
+        newOrderedNames = [newName];
       }
-
-      // Update local state and re-sort based on the new persisted order (or what loadData would do)
-      setOrderedCategories(prev => {
-        const updatedCategories = prev.map(cat =>
-          cat.id === oldCategoryId ? { ...cat, name: newName, id: newName } : cat 
-        );
-        // Re-fetch and re-apply full sort from `loadData` logic to ensure consistency with potentially new `storedOrderedNames`
-        // For simplicity here, we just update the name and id locally, and rely on next full load or drag for perfect re-order from DB.
-        // A more robust way would be to call loadData or replicate its sorting logic here.
-        // For now:
-        let tempStoredOrder = orderDocSnap.exists() ? (orderDocSnap.data()?.orderedNames.map((n: string) => n === oldCategoryName ? newName : n) || []) : [newName];
-        
-        updatedCategories.sort((a, b) => {
-            const indexA = tempStoredOrder.indexOf(a.name);
-            const indexB = tempStoredOrder.indexOf(b.name);
-            if (indexA !== -1 && indexB !== -1) return indexA - indexB;
-            if (indexA !== -1) return -1;
-            if (indexB !== -1) return 1;
-            return a.name.localeCompare(b.name, 'zh-HK');
-        });
-        return updatedCategories;
-      });
-
-
+      await setDoc(orderDocRef, { orderedNames: newOrderedNames }, { merge: true });
+      
       toast({
         title: "系列名稱更新成功",
-        description: `系列 "${oldCategoryName}" 已成功更名為 "${newName}"。`,
+        description: `系列 "${oldCategoryName}" 已成功更名為 "${newName}"。頁面將重新載入以更新。`,
         className: "bg-green-500 text-white border-green-600",
       });
       
-      // Trigger a full reload of data to ensure order is perfectly synced
-      // This might be slightly overkill but ensures consistency if multiple edits happen fast
-      // setRefreshKey(prev => prev + 1); 
-      // Commented out direct refresh, as local update + sort should be mostly fine, 
-      // and full refresh can be jarring. Next full page load will sync.
+      setRefreshKey(prev => prev + 1); 
 
     } catch (error) {
       console.error(`Error updating category name for ${oldCategoryName}:`, error);
@@ -413,57 +386,56 @@ export default function AdminProductsPage() {
     }
   };
 
+  const handleCreateNewCategory = async () => {
+    setIsCreatingCategory(true);
+    const trimmedName = newCategoryNameForCreation.trim();
 
-  const handleSeedDatabase = useCallback(async () => {
-    setIsSeeding(true);
-    toast({
-      title: "開始導入數據...",
-      description: `正在將 ${mockProducts.length} 個模擬產品導入到 Firestore。請稍候。`,
-    });
+    if (!trimmedName) {
+      toast({ title: "錯誤", description: "新系列名稱不能為空。", variant: "destructive" });
+      setIsCreatingCategory(false);
+      return;
+    }
+
+    if (orderedCategories.some(cat => cat.name === trimmedName)) {
+      toast({ title: "錯誤", description: `系列名稱 "${trimmedName}" 已存在。請使用不同的名稱。`, variant: "destructive" });
+      setIsCreatingCategory(false);
+      return;
+    }
 
     try {
-      const batchSize = 400;
-      let productsAddedCount = 0;
+      const orderDocRef = doc(db, CATEGORY_ORDER_COLLECTION, CATEGORY_ORDER_DOC_ID);
+      const orderDocSnap = await getDoc(orderDocRef);
+      let currentOrderedNames: string[] = [];
+      if (orderDocSnap.exists()) {
+        currentOrderedNames = orderDocSnap.data()?.orderedNames || [];
+      }
 
-      for (let i = 0; i < mockProducts.length; i += batchSize) {
-        const batch = writeBatch(db);
-        const chunk = mockProducts.slice(i, i + batchSize);
-
-        chunk.forEach(product => {
-          const productData = {
-            name: product.name,
-            price: product.price,
-            category: product.category,
-            description: product.description || '',
-            imageUrl: product.imageUrl || `https://placehold.co/300x200.png?text=${encodeURIComponent(product.name)}`,
-            'data-ai-hint': product['data-ai-hint'] || 'food item',
-          };
-          const newDocRef = doc(collection(db, 'products'));
-          batch.set(newDocRef, productData);
-        });
-
-        await batch.commit();
-        productsAddedCount += chunk.length;
+      if (!currentOrderedNames.includes(trimmedName)) {
+        currentOrderedNames.push(trimmedName);
+        await setDoc(orderDocRef, { orderedNames: currentOrderedNames }, { merge: true });
       }
 
       toast({
-        title: "數據導入成功！",
-        description: `已成功將 ${productsAddedCount} 個產品導入到您的 Firestore 產品庫中。`,
-        variant: "default",
+        title: "新增系列成功",
+        description: `系列 "${trimmedName}" 已成功新增。`,
         className: "bg-green-500 text-white border-green-600",
       });
-      setRefreshKey(prevKey => prevKey + 1); // Trigger data reload to reflect new products and categories
+
+      setNewCategoryDialogOpen(false);
+      setNewCategoryNameForCreation('');
+      setRefreshKey(prev => prev + 1); // Refresh data to show the new category
     } catch (error) {
-      console.error("Error seeding database:", error);
+      console.error(`Error creating new category ${trimmedName}:`, error);
       toast({
-        title: "數據導入失敗",
-        description: "導入產品數據到 Firestore 時發生錯誤。請檢查瀏覽器主控台獲取詳細資訊，並確認 Firestore 安全性規則允許寫入。",
+        title: "新增系列失敗",
+        description: `新增系列 "${trimmedName}" 時發生錯誤。請重試。`,
         variant: "destructive",
       });
     } finally {
-      setIsSeeding(false);
+      setIsCreatingCategory(false);
     }
-  }, [toast, setIsSeeding, setRefreshKey]);
+  };
+
 
   return (
     <div className="space-y-8">
@@ -478,7 +450,7 @@ export default function AdminProductsPage() {
           </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 items-stretch">
-             <Button variant="outline" asChild className="border-purple-500 text-purple-600 hover:bg-purple-500/10 hover:text-purple-700 shadow-md hover:shadow-lg transition-shadow" disabled={isLoading}>
+            <Button variant="outline" asChild className="border-purple-500 text-purple-600 hover:bg-purple-500/10 hover:text-purple-700 shadow-md hover:shadow-lg transition-shadow" disabled={isLoading}>
                 <Link href="/admin/products/import-image">
                     <BrainCircuit className="mr-2 h-5 w-5" />
                     從圖片導入 (AI)
@@ -506,7 +478,15 @@ export default function AdminProductsPage() {
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
-
+             <Button 
+                variant="outline" 
+                onClick={() => setIsNewCategoryDialogOpen(true)} 
+                disabled={isLoading || isSeeding}
+                className="shadow-md hover:shadow-lg transition-shadow"
+            >
+                <PlusCircle className="mr-2 h-5 w-5" />
+                新增系列
+            </Button>
             <Button variant="default" size="lg" asChild className="shadow-md hover:shadow-lg transition-shadow transform hover:scale-105" disabled={isLoading}>
             <Link href="/admin/products/add">
                 <PlusCircle className="mr-2 h-5 w-5" />
@@ -559,16 +539,53 @@ export default function AdminProductsPage() {
               onChange={(e) => setNewCategoryNameInput(e.target.value)}
               placeholder="輸入新的系列名稱"
               autoFocus
+              disabled={isEditingCategoryName}
             />
           </div>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => { setCategoryToEdit(null); setNewCategoryNameInput(''); }}>取消</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => { setCategoryToEdit(null); setNewCategoryNameInput(''); }} disabled={isEditingCategoryName}>取消</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleConfirmEditCategory}
               disabled={isEditingCategoryName || !newCategoryNameInput.trim() || newCategoryNameInput.trim() === categoryToEdit?.name}
             >
               {isEditingCategoryName && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               確認更新
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={isNewCategoryDialogOpen} onOpenChange={(open) => { if(!open) {setIsNewCategoryDialogOpen(false); setNewCategoryNameForCreation('');} }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>新增產品系列</AlertDialogTitle>
+            <AlertDialogDescription>
+              輸入新系列的名稱。建立後，您可以開始向此系列新增產品。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-2 space-y-2">
+            <Label htmlFor="newCategoryNameCreation" className="text-sm font-medium">
+              新系列名稱*
+            </Label>
+            <Input
+              id="newCategoryNameCreation"
+              value={newCategoryNameForCreation}
+              onChange={(e) => setNewCategoryNameForCreation(e.target.value)}
+              placeholder="例如：熱門推介"
+              autoFocus
+              disabled={isCreatingCategory}
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => { setIsNewCategoryDialogOpen(false); setNewCategoryNameForCreation(''); }} disabled={isCreatingCategory}>
+              取消
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleCreateNewCategory}
+              disabled={isCreatingCategory || !newCategoryNameForCreation.trim()}
+            >
+              {isCreatingCategory && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              確認新增
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -624,7 +641,7 @@ export default function AdminProductsPage() {
           <DatabaseZap className="mx-auto h-16 w-16 text-muted-foreground mb-6" />
           <p className="text-xl font-headline text-primary mb-2">未找到任何產品系列</p>
           <p className="mt-2 text-foreground max-w-md mx-auto">
-            您的產品庫目前是空的。您可以透過「新增產品」按鈕手動加入產品，或使用「從模擬數據導入產品」功能來快速填充產品庫。
+            您的產品庫目前是空的。您可以透過「新增產品」按鈕手動加入產品，使用「從模擬數據導入產品」功能來快速填充產品庫，或使用「新增系列」來建立一個空的產品系列。
           </p>
            <p className="text-xs text-muted-foreground mt-4">
             如果已導入或新增但仍未顯示，請檢查您的Firebase設定、Firestore安全性規則和資料庫連線。
@@ -634,3 +651,4 @@ export default function AdminProductsPage() {
     </div>
   );
 }
+
