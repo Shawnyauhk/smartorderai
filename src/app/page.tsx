@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useRef } from 'react'; 
-import { identifyLanguage } from '@/ai/flows/identify-language-flow.ts'; // New import
+import { identifyLanguage } from '@/ai/flows/identify-language-flow.ts'; 
 import { parseOrder } from '@/ai/flows/parse-order.ts';
 import type { ParseOrderOutput, ParsedAiOrderItem } from '@/ai/flows/parse-order.ts';
 import type { CartItem, Product } from '@/types';
@@ -13,7 +13,7 @@ import PaymentSelector from '@/components/PaymentSelector';
 import ManualOrderSection from '@/components/ManualOrderSection';
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from '@/components/ui/separator';
-import { AlertCircle, Check, X, ShoppingCart, Edit3, CheckCircle, LayoutGrid, Languages } from 'lucide-react';
+import { AlertCircle, Check, X, ShoppingCart, Edit3, CheckCircle, LayoutGrid, Languages, MessageSquareWarning, ShieldCheck, ShieldX } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -133,14 +133,12 @@ export default function HomePage() {
         className: "bg-green-500 text-white border-green-600"
       });
   
-      let itemRemoved = false;
-      const newAiSuggestedItems = aiSuggestedItems.filter(suggestion => {
-          if (!itemRemoved && suggestion.item === aiItemToAdd.item && suggestion.quantity === aiItemToAdd.quantity && suggestion.specialRequests === aiItemToAdd.specialRequests) {
-              itemRemoved = true;
-              return false; 
-          }
-          return true; 
-      });
+      // Filter out the exact item that was added
+      const newAiSuggestedItems = aiSuggestedItems.filter(suggestion => 
+        !(suggestion.item === aiItemToAdd.item && 
+          suggestion.quantity === aiItemToAdd.quantity && 
+          suggestion.specialRequests === aiItemToAdd.specialRequests)
+      );
   
       if (newAiSuggestedItems.length === 0) {
         setShowAiConfirmation(false);
@@ -156,14 +154,12 @@ export default function HomePage() {
         variant: "destructive",
       });
       
-      let itemRemovedErrorCase = false;
-      const newAiSuggestedItemsErrorCase = aiSuggestedItems.filter(suggestion => {
-        if(!itemRemovedErrorCase && suggestion.item === aiItemToAdd.item && suggestion.quantity === aiItemToAdd.quantity && suggestion.specialRequests === aiItemToAdd.specialRequests) {
-            itemRemovedErrorCase = true;
-            return false;
-        }
-        return true;
-      });
+      // Filter out the exact item that failed to add
+      const newAiSuggestedItemsErrorCase = aiSuggestedItems.filter(suggestion => 
+        !(suggestion.item === aiItemToAdd.item && 
+          suggestion.quantity === aiItemToAdd.quantity && 
+          suggestion.specialRequests === aiItemToAdd.specialRequests)
+      );
 
       if (newAiSuggestedItemsErrorCase.length === 0) {
         setShowAiConfirmation(false);
@@ -173,17 +169,83 @@ export default function HomePage() {
       }
     }
   };
+  
+  const handleClarifyAmbiguousItem = (ambiguousItem: ParsedAiOrderItem, chosenAlternativeName: string) => {
+    const product = findProductByName(chosenAlternativeName);
+    if (product) {
+      setParsedOrderItems(prevItems => {
+        let currentCartItems = [...prevItems];
+        const existingItemIndex = currentCartItems.findIndex(
+          (cartItem) => cartItem.productId === product.id && cartItem.specialRequests === (ambiguousItem.specialRequests || undefined)
+        );
+
+        if (existingItemIndex > -1) {
+          currentCartItems[existingItemIndex].quantity += ambiguousItem.quantity;
+        } else {
+          currentCartItems.push({
+            productId: product.id,
+            name: product.name,
+            quantity: ambiguousItem.quantity,
+            unitPrice: product.price,
+            specialRequests: ambiguousItem.specialRequests,
+            imageUrl: product.imageUrl,
+            "data-ai-hint": product["data-ai-hint"],
+          });
+        }
+        setTotalAmount(recalculateTotal(currentCartItems));
+        return currentCartItems;
+      });
+
+      toast({
+        title: "已釐清並加入",
+        description: `${product.name} (x${ambiguousItem.quantity}) 已成功加入您的訂單。`,
+        variant: "default",
+        className: "bg-green-500 text-white border-green-600"
+      });
+    } else {
+      toast({
+        title: "未能加入餐點",
+        description: `抱歉，未能找到所選的餐點 "${chosenAlternativeName}"。`,
+        variant: "destructive",
+      });
+    }
+
+    // Remove the original ambiguous item from suggestions
+    const newAiSuggestedItems = aiSuggestedItems.filter(item => item !== ambiguousItem);
+    if (newAiSuggestedItems.length === 0) {
+      setShowAiConfirmation(false);
+      setAiSuggestedItems([]);
+    } else {
+      setAiSuggestedItems(newAiSuggestedItems);
+    }
+  };
+
+  const handleDismissAmbiguousItem = (ambiguousItem: ParsedAiOrderItem) => {
+    const newAiSuggestedItems = aiSuggestedItems.filter(item => item !== ambiguousItem);
+    if (newAiSuggestedItems.length === 0) {
+      setShowAiConfirmation(false);
+      setAiSuggestedItems([]);
+    } else {
+      setAiSuggestedItems(newAiSuggestedItems);
+    }
+    toast({
+      title: "建議已忽略",
+      description: `關於 "${ambiguousItem.item}" 的建議已被忽略。`,
+    });
+  };
+
 
   const handleConfirmAiSuggestions = () => {
     let currentCartItems = [...parsedOrderItems];
     let newItemsAddedCount = 0;
     let itemsNotFoundStrings: string[] = [];
-    let ambiguousItemsInfo: string[] = [];
+    let ambiguousItemsNotClarified: ParsedAiOrderItem[] = [];
+
 
     aiSuggestedItems.forEach((aiItem) => {
       if (aiItem.isAmbiguous && aiItem.alternatives && aiItem.alternatives.length > 0) {
-        const alternativesText = aiItem.alternatives.join(' 或 ');
-        ambiguousItemsInfo.push(`關於「${aiItem.item}」(您要求 ${aiItem.quantity}份)，AI 認為可能是以下其中之一：${alternativesText}。`);
+        // Ambiguous items are skipped by "confirm all", they need manual clarification
+        ambiguousItemsNotClarified.push(aiItem);
         return; 
       }
 
@@ -216,35 +278,33 @@ export default function HomePage() {
     setParsedOrderItems(currentCartItems);
     setTotalAmount(newTotal);
 
-    if (ambiguousItemsInfo.length > 0) {
+    if (ambiguousItemsNotClarified.length > 0) {
+      const ambiguousItemNames = ambiguousItemsNotClarified.map(item => `「${item.item}」`).join('、');
       toast({
         title: "部分項目需要釐清",
-        description: (
-          <div>
-            {ambiguousItemsInfo.map((info, idx) => <p key={idx}>{info}</p>)}
-            <p className="mt-2">請您更明確地指出這些項目，或使用手動選擇功能。其他無歧義的項目已（或嘗試）加入訂單。</p>
-          </div>
-        ),
+        description: `AI 建議中的 ${ambiguousItemNames} 項目因有歧義，需要您手動選擇。其他無歧義的項目已嘗試加入訂單。`,
         variant: "destructive",
         duration: 10000,
       });
     }
 
-    if (newItemsAddedCount > 0 && itemsNotFoundStrings.length === 0 && ambiguousItemsInfo.length === 0) {
+    if (newItemsAddedCount > 0 && itemsNotFoundStrings.length === 0 && ambiguousItemsNotClarified.length === 0) {
       toast({
         title: "訂單已更新！",
         description: "AI建議的餐點已成功加入您的訂單。",
         variant: "default",
         className: "bg-green-500 text-white border-green-600"
       });
-    } else if (newItemsAddedCount > 0 && itemsNotFoundStrings.length > 0) {
+    } else if (newItemsAddedCount > 0 && (itemsNotFoundStrings.length > 0 || ambiguousItemsNotClarified.length > 0) ) {
+      let desc = `AI建議的部分餐點已加入。`;
+      if (itemsNotFoundStrings.length > 0) desc += ` 未能找到：${itemsNotFoundStrings.join('、')}。`;
       toast({
         title: "部分餐點已加入",
-        description: `AI建議的部分餐點已加入。未能找到：${itemsNotFoundStrings.join('、')}。`,
+        description: desc,
         variant: "destructive",
         duration: 7000,
       });
-    } else if (newItemsAddedCount === 0 && itemsNotFoundStrings.length > 0 && ambiguousItemsInfo.length === 0 ) {
+    } else if (newItemsAddedCount === 0 && itemsNotFoundStrings.length > 0 && ambiguousItemsNotClarified.length === 0) {
        toast({
         title: "未能加入AI建議餐點",
         description: `AI建議的餐點均未能找到：${itemsNotFoundStrings.join('、')}。`,
@@ -252,8 +312,13 @@ export default function HomePage() {
       });
     }
     
-    setShowAiConfirmation(false);
-    setAiSuggestedItems([]);
+    // Clear only non-ambiguous items or all if none were ambiguous
+    if (ambiguousItemsNotClarified.length > 0) {
+      setAiSuggestedItems(ambiguousItemsNotClarified);
+    } else {
+      setShowAiConfirmation(false);
+      setAiSuggestedItems([]);
+    }
   };
 
   const handleCancelAiSuggestions = () => {
@@ -355,11 +420,10 @@ export default function HomePage() {
               AI 為您建議的訂單
             </CardTitle>
             <CardDescription>
-              這是AI根據您的描述理解的內容。您可以點擊單個項目加入購物車，或確認加入全部建議。
-              對於有歧義的項目，AI會列出可能的選項，請您在確認前先作判斷。
+              這是AI根據您的描述理解的內容。您可以點擊單個項目加入購物車，或確認加入全部建議 (有歧義的項目需手動處理)。
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="space-y-3">
             {aiSuggestedItems.map((item, index) => {
               const isItemAmbiguous = item.isAmbiguous && item.alternatives && item.alternatives.length > 0;
               const sr = item.specialRequests;
@@ -367,25 +431,48 @@ export default function HomePage() {
 
               if (isItemAmbiguous) {
                 return (
-                  <div key={`${item.item}-${index}-ambiguous`} className="p-3 border rounded-md border-destructive bg-destructive/10">
-                    <p className="font-semibold text-destructive-foreground">
+                  <div key={`${item.item}-${index}-ambiguous`} className="p-4 border rounded-md border-amber-500 bg-amber-500/10 shadow-sm">
+                    <p className="font-semibold text-amber-700 flex items-center">
+                      <MessageSquareWarning className="w-5 h-5 mr-2 flex-shrink-0"/>
                       關於「{item.item}」(您要求 {item.quantity}份)，AI 認為可能是以下其中之一：
                     </p>
-                    <ul className="list-disc list-inside text-sm text-destructive-foreground/90 pl-4 mt-2 space-y-1">
-                      {item.alternatives!.map(alt => <li key={alt}>{alt}</li>)}
-                    </ul>
+                    <div className="mt-3 space-y-2 pl-2">
+                      {item.alternatives!.map(alt => (
+                        <Button
+                          key={alt}
+                          variant="outline"
+                          onClick={() => handleClarifyAmbiguousItem(item, alt)}
+                          className="w-full justify-start text-left p-2 h-auto border-amber-600 hover:bg-amber-600/20 focus:ring-amber-500 group"
+                          aria-label={`選擇 ${alt} 以釐清 ${item.item}`}
+                        >
+                           <ShieldCheck className="h-5 w-5 mr-2 text-green-600 group-hover:text-green-700 flex-shrink-0" />
+                          {alt} 
+                          <span className="text-xs text-muted-foreground ml-1">(數量: {item.quantity})</span>
+                          {showSpecialRequestsLine && <span className="text-xs text-primary ml-2">({item.specialRequests})</span>}
+                        </Button>
+                      ))}
+                       <Button
+                        variant="ghost"
+                        onClick={() => handleDismissAmbiguousItem(item)}
+                        className="w-full justify-start text-left p-2 h-auto text-muted-foreground hover:bg-destructive/10 hover:text-destructive group"
+                        aria-label={`忽略關於 ${item.item} 的建議`}
+                      >
+                         <ShieldX className="h-5 w-5 mr-2 group-hover:text-destructive flex-shrink-0" />
+                        都不是，忽略此建議
+                      </Button>
+                    </div>
                     <p className="text-xs text-muted-foreground mt-3">
-                      由於無法確定，請您從上方選項中選擇一項，並使用「手動選擇餐點」功能將其加入訂單，或更清晰地重新描述此項目。
+                      請從上方選項中選擇一項，或忽略此建議。
                     </p>
                   </div>
                 );
-              } else {
+              } else { // Not ambiguous
                 return (
                   <Button
                     key={`${item.item}-${index}-suggestion`}
                     variant="outline"
                     onClick={() => handleAddSpecificAiSuggestion(item)}
-                    className="w-full justify-start text-left p-3 h-auto border rounded-md bg-muted/30 hover:bg-muted/70 focus:ring-2 focus:ring-primary transition-all group"
+                    className="w-full justify-between items-center text-left p-3 h-auto border rounded-md bg-muted/30 hover:bg-muted/70 focus:ring-2 focus:ring-primary transition-all group"
                     aria-label={`選擇並加入 ${item.item}`}
                   >
                     <div className="flex-grow">
@@ -394,7 +481,7 @@ export default function HomePage() {
                         <p className="text-xs text-primary mt-1">特別要求: {item.specialRequests}</p>
                       )}
                     </div>
-                    <CheckCircle className="h-5 w-5 text-green-500 opacity-0 group-hover:opacity-100 transition-opacity ml-4" />
+                    <CheckCircle className="h-5 w-5 text-green-500 opacity-0 group-hover:opacity-100 transition-opacity ml-4 flex-shrink-0" />
                   </Button>
                 );
               }
@@ -405,7 +492,11 @@ export default function HomePage() {
               <X className="mr-2 h-4 w-4" />
               取消並重新輸入
             </Button>
-            <Button onClick={handleConfirmAiSuggestions} className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white">
+            <Button 
+                onClick={handleConfirmAiSuggestions} 
+                className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white"
+                disabled={aiSuggestedItems.every(item => item.isAmbiguous && item.alternatives && item.alternatives.length > 0) && aiSuggestedItems.length > 0} // Disable if all items are ambiguous
+            >
               <Check className="mr-2 h-4 w-4" />
               確認並加入項目
             </Button>
@@ -477,3 +568,4 @@ export default function HomePage() {
   );
 }
     
+
