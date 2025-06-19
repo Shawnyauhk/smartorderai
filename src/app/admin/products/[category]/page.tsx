@@ -1,12 +1,12 @@
 
 "use client";
 
-import { use, useState, useEffect } from 'react';
+import { use, useState, useEffect, useCallback } from 'react';
 import ProductCard from '@/components/ProductCard';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { ArrowLeftCircle, ListOrdered, GripVertical } from 'lucide-react';
+import { ArrowLeftCircle, ListOrdered, GripVertical, Trash2, Loader2 } from 'lucide-react';
 import type { Product } from '@/types';
 import {
   DndContext,
@@ -25,9 +25,19 @@ import {
   rectSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, doc, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type Props = {
   params: Promise<{ category: string }>;
@@ -35,9 +45,10 @@ type Props = {
 
 interface SortableProductItemProps {
   product: Product;
+  onDeleteAttempt: (productId: string, productName: string) => void;
 }
 
-function SortableProductItem({ product }: SortableProductItemProps) {
+function SortableProductItem({ product, onDeleteAttempt }: SortableProductItemProps) {
   const {
     attributes,
     listeners,
@@ -55,12 +66,12 @@ function SortableProductItem({ product }: SortableProductItemProps) {
   };
 
   return (
-    <div ref={setNodeRef} style={style} className="relative touch-manipulation group/productcard">
-      <ProductCard product={product} />
+    <div ref={setNodeRef} style={style} className="relative touch-manipulation group/sortableitem">
+      <ProductCard product={product} onDeleteAttempt={onDeleteAttempt} />
       <button
         {...attributes}
         {...listeners}
-        className="absolute top-2 right-2 p-1 text-muted-foreground bg-card/70 rounded-full hover:text-foreground cursor-grab active:cursor-grabbing opacity-0 group-hover/productcard:opacity-100 transition-opacity"
+        className="absolute top-2 right-2 p-1 text-muted-foreground bg-card/70 rounded-full hover:text-foreground cursor-grab active:cursor-grabbing opacity-0 group-hover/sortableitem:opacity-100 transition-opacity"
         aria-label={`拖動排序 ${product.name}`}
       >
         <GripVertical className="h-5 w-5" />
@@ -76,34 +87,50 @@ export default function CategoryProductsPage({ params: paramsPromise }: Props) {
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
-  useEffect(() => {
-    document.title = `${decodedCategory} - 產品列表 - 智能點餐AI`;
-    const fetchProducts = async () => {
-      if (!decodedCategory) return;
-      setIsLoading(true);
-      try {
-        const productsCol = collection(db, 'products');
-        const q = query(productsCol, where('category', '==', decodedCategory), orderBy('name')); // Example: order by name
-        const productsSnapshot = await getDocs(q);
-        const fetchedProducts: Product[] = productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
-        
-        setOrderedProducts(fetchedProducts);
+  const [productToDelete, setProductToDelete] = useState<{id: string; name: string} | null>(null);
+  const [isDeletingProduct, setIsDeletingProduct] = useState(false);
 
-      } catch (error) {
-        console.error(`Error fetching products for category ${decodedCategory}:`, error);
+  const fetchProducts = useCallback(async () => {
+    if (!decodedCategory) return;
+    setIsLoading(true);
+    try {
+      const productsCol = collection(db, 'products');
+      const q = query(productsCol, where('category', '==', decodedCategory), orderBy('name'));
+      const productsSnapshot = await getDocs(q);
+      const fetchedProducts: Product[] = productsSnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Product));
+      
+      setOrderedProducts(fetchedProducts);
+
+    } catch (error) {
+      console.error(`Error fetching products for category ${decodedCategory}:`, error);
+      if ((error as any)?.code === 'failed-precondition' && (error as any)?.message?.includes('requires an index')) {
+         toast({
+          title: "查詢需要索引",
+          description: (
+            <div>
+              <p>Firestore 需要一個複合索引來執行此查詢。錯誤訊息中應包含建立索引的連結。</p>
+              <p className="mt-2 text-xs">錯誤詳情: {(error as Error).message}</p>
+            </div>
+          ),
+          variant: "destructive",
+          duration: 10000,
+        });
+      } else {
         toast({
           title: "讀取產品失敗",
           description: `無法從資料庫讀取 ${decodedCategory} 系列的產品。請檢查您的 Firebase 設定或網絡連線。`,
           variant: "destructive",
         });
-        // setOrderedProducts([]); // Or fallback to mock data if necessary
-      } finally {
-        setIsLoading(false);
       }
-    };
-
-    fetchProducts();
+    } finally {
+      setIsLoading(false);
+    }
   }, [decodedCategory, toast]);
+
+  useEffect(() => {
+    document.title = `${decodedCategory} - 產品列表 - 智能點餐AI`;
+    fetchProducts();
+  }, [decodedCategory, fetchProducts]);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -114,17 +141,42 @@ export default function CategoryProductsPage({ params: paramsPromise }: Props) {
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
-
     if (over && active.id !== over.id) {
       setOrderedProducts((items) => {
         const oldIndex = items.findIndex((item) => item.id === active.id);
         const newIndex = items.findIndex((item) => item.id === over.id);
-        // Note: This reordering is client-side only.
-        // For persistence, you'd need to update Firestore.
         return arrayMove(items, oldIndex, newIndex);
       });
     }
   }
+
+  const handleAttemptDeleteProduct = (productId: string, productName: string) => {
+    setProductToDelete({ id: productId, name: productName });
+  };
+
+  const confirmDeleteSingleProduct = async () => {
+    if (!productToDelete) return;
+    setIsDeletingProduct(true);
+    try {
+      await deleteDoc(doc(db, 'products', productToDelete.id));
+      setOrderedProducts(prev => prev.filter(p => p.id !== productToDelete.id));
+      toast({
+        title: "產品刪除成功",
+        description: `產品 "${productToDelete.name}" 已成功刪除。`,
+        className: "bg-green-500 text-white border-green-600",
+      });
+    } catch (error) {
+      console.error(`Error deleting product ${productToDelete.name}:`, error);
+      toast({
+        title: "刪除產品失敗",
+        description: `刪除產品 "${productToDelete.name}" 時發生錯誤。請重試。`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeletingProduct(false);
+      setProductToDelete(null);
+    }
+  };
   
   return (
     <div className="space-y-8">
@@ -141,16 +193,39 @@ export default function CategoryProductsPage({ params: paramsPromise }: Props) {
             {decodedCategory}
           </h1>
           <p className="text-lg text-muted-foreground mt-1">
-            瀏覽 {decodedCategory} 系列中的所有產品。您可以拖動卡片調整產品順序。
+            瀏覽 {decodedCategory} 系列中的所有產品。您可以拖動卡片調整產品順序，或刪除產品。
           </p>
         </div>
       </div>
       
       <Separator />
 
+      <AlertDialog open={!!productToDelete} onOpenChange={(open) => !open && setProductToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>確認刪除產品？</AlertDialogTitle>
+            <AlertDialogDescription>
+              您確定要刪除產品「{productToDelete?.name}」嗎？此操作**無法復原**。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setProductToDelete(null)}>取消</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmDeleteSingleProduct} 
+              disabled={isDeletingProduct}
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+            >
+              {isDeletingProduct && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              確認刪除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {isLoading ? (
          <div className="text-center py-12">
-            <p className="text-xl text-muted-foreground animate-pulse">正在載入 {decodedCategory} 產品...</p>
+            <Loader2 className="mx-auto h-12 w-12 text-primary animate-spin mb-4" />
+            <p className="text-xl text-muted-foreground">正在載入 {decodedCategory} 產品...</p>
          </div>
       ) : orderedProducts.length > 0 ? (
         <DndContext
@@ -164,7 +239,11 @@ export default function CategoryProductsPage({ params: paramsPromise }: Props) {
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {orderedProducts.map((product) => (
-                <SortableProductItem key={product.id} product={product} />
+                <SortableProductItem 
+                    key={product.id} 
+                    product={product} 
+                    onDeleteAttempt={handleAttemptDeleteProduct} 
+                />
               ))}
             </div>
           </SortableContext>

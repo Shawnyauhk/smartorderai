@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { PlusCircle, FolderKanban, GripVertical, DatabaseZap, Loader2, BrainCircuit } from 'lucide-react';
+import { PlusCircle, FolderKanban, GripVertical, DatabaseZap, Loader2, BrainCircuit, Trash2 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import type { Product } from '@/types';
 import {
@@ -25,7 +25,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { collection, getDocs, query, writeBatch, doc } from 'firebase/firestore';
+import { collection, getDocs, query, writeBatch, doc, where, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { mockProducts } from '@/lib/product-data';
@@ -39,16 +39,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
+} from "@/components/ui/alert-dialog";
 
 type CategoryEntry = { id: string; name: string; count: number };
 
 interface SortableCategoryCardProps {
   categoryItem: CategoryEntry;
   children: React.ReactNode;
+  onDeleteRequest: (category: CategoryEntry) => void;
 }
 
-function SortableCategoryCard({ categoryItem, children }: SortableCategoryCardProps) {
+function SortableCategoryCard({ categoryItem, children, onDeleteRequest }: SortableCategoryCardProps) {
   const {
     attributes,
     listeners,
@@ -66,16 +67,30 @@ function SortableCategoryCard({ categoryItem, children }: SortableCategoryCardPr
   };
 
   return (
-    <div ref={setNodeRef} style={style} className="relative touch-manipulation">
+    <div ref={setNodeRef} style={style} className="relative touch-manipulation group/categorycard">
       {children}
       <button
         {...attributes}
         {...listeners}
-        className="absolute top-2 right-2 p-1 text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing"
+        className="absolute top-2 right-10 p-1 text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing opacity-0 group-hover/categorycard:opacity-100 transition-opacity"
         aria-label={`拖動排序 ${categoryItem.name}`}
       >
         <GripVertical className="h-5 w-5" />
       </button>
+      <AlertDialogTrigger asChild>
+        <Button 
+            variant="ghost" 
+            size="icon" 
+            className="absolute top-1 right-1 p-1 text-destructive hover:bg-destructive/10 opacity-0 group-hover/categorycard:opacity-100 transition-opacity"
+            onClick={(e) => {
+              e.stopPropagation(); // Prevent link navigation
+              onDeleteRequest(categoryItem);
+            }}
+            aria-label={`刪除系列 ${categoryItem.name}`}
+            >
+            <Trash2 className="h-5 w-5" />
+        </Button>
+      </AlertDialogTrigger>
     </div>
   );
 }
@@ -84,49 +99,50 @@ export default function AdminProductsPage() {
   const [orderedCategories, setOrderedCategories] = useState<CategoryEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSeeding, setIsSeeding] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0); // Used to trigger re-fetch
+  const [refreshKey, setRefreshKey] = useState(0);
   const { toast } = useToast();
+
+  const [categoryToDelete, setCategoryToDelete] = useState<CategoryEntry | null>(null);
+  const [isDeletingCategory, setIsDeletingCategory] = useState(false);
+
+  const loadData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const productsCol = collection(db, 'products');
+      const productsSnapshot = await getDocs(query(productsCol));
+      const fetchedProducts: Product[] = productsSnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Product));
+
+      const categoriesMap = fetchedProducts.reduce((acc, product) => {
+        if (!product.category) return acc;
+        if (!acc[product.category]) {
+          acc[product.category] = 0;
+        }
+        acc[product.category]++;
+        return acc;
+      }, {} as Record<string, number>);
+
+      const initialCategories = Object.entries(categoriesMap)
+        .map(([name, count]) => ({ id: name, name, count }))
+        .sort((a, b) => a.name.localeCompare(b.name, 'zh-HK'));
+
+      setOrderedCategories(initialCategories);
+
+    } catch (error) {
+      console.error("Error fetching products from Firestore:", error);
+      toast({
+        title: "讀取產品資料失敗",
+        description: "無法從資料庫讀取產品系列。請檢查您的 Firebase 設定、Firestore 安全性規則或網絡連線。",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [toast]);
 
   useEffect(() => {
     document.title = "產品系列 - 智能點餐AI";
-
-    const loadData = async () => {
-      setIsLoading(true);
-      try {
-        const productsCol = collection(db, 'products');
-        // Consider adding orderBy and appropriate indexing in Firestore for consistent ordering
-        const productsSnapshot = await getDocs(query(productsCol));
-        const fetchedProducts: Product[] = productsSnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Product));
-
-        const categoriesMap = fetchedProducts.reduce((acc, product) => {
-          if (!product.category) return acc; // Skip products without a category
-          if (!acc[product.category]) {
-            acc[product.category] = 0;
-          }
-          acc[product.category]++;
-          return acc;
-        }, {} as Record<string, number>);
-
-        const initialCategories = Object.entries(categoriesMap)
-          .map(([name, count]) => ({ id: name, name, count }))
-          .sort((a, b) => a.name.localeCompare(b.name, 'zh-HK')); // Sort by name
-
-        setOrderedCategories(initialCategories);
-
-      } catch (error) {
-        console.error("Error fetching products from Firestore:", error);
-        toast({
-          title: "讀取產品資料失敗",
-          description: "無法從資料庫讀取產品系列。請檢查您的 Firebase 設定、Firestore 安全性規則或網絡連線。",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     loadData();
-  }, [toast, refreshKey, setIsLoading, setOrderedCategories]); // refreshKey added as dependency
+  }, [loadData, refreshKey]);
 
 
   const sensors = useSensors(
@@ -142,12 +158,51 @@ export default function AdminProductsPage() {
       setOrderedCategories((items) => {
         const oldIndex = items.findIndex((item) => item.id === active.id);
         const newIndex = items.findIndex((item) => item.id === over.id);
-        // Note: This reordering is client-side only.
-        // For persistence, you'd need to update Firestore with an 'order' field or similar.
         return arrayMove(items, oldIndex, newIndex);
       });
     }
   }
+
+  const handleRequestDeleteCategory = (category: CategoryEntry) => {
+    setCategoryToDelete(category);
+  };
+
+  const handleConfirmDeleteCategory = async () => {
+    if (!categoryToDelete) return;
+
+    setIsDeletingCategory(true);
+    try {
+      const productsCol = collection(db, 'products');
+      const q = query(productsCol, where('category', '==', categoryToDelete.name));
+      const productsSnapshot = await getDocs(q);
+
+      if (!productsSnapshot.empty) {
+        const batch = writeBatch(db);
+        productsSnapshot.docs.forEach((productDoc) => {
+          batch.delete(doc(db, 'products', productDoc.id));
+        });
+        await batch.commit();
+      }
+      
+      setOrderedCategories(prev => prev.filter(c => c.id !== categoryToDelete.id));
+      toast({
+        title: "系列刪除成功",
+        description: `系列 "${categoryToDelete.name}" 及其所有產品已成功刪除。`,
+        className: "bg-green-500 text-white border-green-600",
+      });
+    } catch (error) {
+      console.error(`Error deleting category ${categoryToDelete.name}:`, error);
+      toast({
+        title: "刪除系列失敗",
+        description: `刪除系列 "${categoryToDelete.name}" 時發生錯誤。請重試。`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeletingCategory(false);
+      setCategoryToDelete(null);
+    }
+  };
+
 
   const handleSeedDatabase = useCallback(async () => {
     setIsSeeding(true);
@@ -157,7 +212,7 @@ export default function AdminProductsPage() {
     });
 
     try {
-      const batchSize = 400; // Firestore batch limit is 500 operations
+      const batchSize = 400;
       let productsAddedCount = 0;
 
       for (let i = 0; i < mockProducts.length; i += batchSize) {
@@ -173,7 +228,6 @@ export default function AdminProductsPage() {
             imageUrl: product.imageUrl || `https://placehold.co/300x200.png?text=${encodeURIComponent(product.name)}`,
             'data-ai-hint': product['data-ai-hint'] || 'food item',
           };
-          // Generate a new document reference with an auto-generated ID
           const newDocRef = doc(collection(db, 'products'));
           batch.set(newDocRef, productData);
         });
@@ -188,7 +242,7 @@ export default function AdminProductsPage() {
         variant: "default",
         className: "bg-green-500 text-white border-green-600",
       });
-      setRefreshKey(prevKey => prevKey + 1); // Trigger data refresh
+      setRefreshKey(prevKey => prevKey + 1);
     } catch (error) {
       console.error("Error seeding database:", error);
       toast({
@@ -197,7 +251,6 @@ export default function AdminProductsPage() {
         variant: "destructive",
       });
     } finally {
-      console.log("Seeding process finally block reached."); // Diagnostic log
       setIsSeeding(false);
     }
   }, [toast, setIsSeeding, setRefreshKey]);
@@ -211,7 +264,7 @@ export default function AdminProductsPage() {
             產品系列
           </h1>
           <p className="text-lg text-muted-foreground mt-1">
-            選擇一個系列以查看詳細產品。您可以拖動卡片調整系列順序。
+            選擇一個系列以查看詳細產品。您可以拖動卡片調整系列順序，或刪除系列。
           </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 items-stretch">
@@ -255,6 +308,29 @@ export default function AdminProductsPage() {
 
       <Separator />
 
+      <AlertDialog open={!!categoryToDelete} onOpenChange={(open) => !open && setCategoryToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>確認刪除系列？</AlertDialogTitle>
+            <AlertDialogDescription>
+              您確定要刪除系列「{categoryToDelete?.name}」嗎？
+              此操作將同時刪除此系列下的所有 {categoryToDelete?.count} 個產品，且**無法復原**。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setCategoryToDelete(null)}>取消</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleConfirmDeleteCategory} 
+              disabled={isDeletingCategory}
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+            >
+              {isDeletingCategory && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              確認刪除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {isLoading ? (
         <div className="text-center py-12">
           <Loader2 className="mx-auto h-12 w-12 text-primary animate-spin mb-4" />
@@ -272,11 +348,11 @@ export default function AdminProductsPage() {
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {orderedCategories.map((categoryItem) => (
-                <SortableCategoryCard key={categoryItem.id} categoryItem={categoryItem}>
+                <SortableCategoryCard key={categoryItem.id} categoryItem={categoryItem} onDeleteRequest={handleRequestDeleteCategory}>
                   <Card className="h-full flex flex-col justify-between hover:shadow-lg transition-shadow duration-300 ease-in-out transform hover:-translate-y-1">
                     <Link
                       href={`/admin/products/${encodeURIComponent(categoryItem.name)}`}
-                      className="block hover:no-underline flex-grow p-1" // Ensure link covers card
+                      className="block hover:no-underline flex-grow p-1"
                     >
                         <CardHeader>
                           <CardTitle className="text-2xl font-headline text-primary">{categoryItem.name}</CardTitle>
@@ -307,4 +383,3 @@ export default function AdminProductsPage() {
     </div>
   );
 }
-

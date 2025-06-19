@@ -5,23 +5,25 @@ import type { Product } from '@/types';
 import Image from 'next/image';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { DollarSign, Tag, PlusCircle } from 'lucide-react';
+import { DollarSign, Tag, PlusCircle, Trash2 } from 'lucide-react';
 import { Button } from './ui/button';
 
 interface ProductCardProps {
   product: Product;
   onAddToCart?: (product: Product) => void;
+  onDeleteAttempt?: (productId: string, productName: string) => void; // New prop
 }
 
 const ProductCard: React.FC<ProductCardProps> = ({ 
   product,
   onAddToCart,
+  onDeleteAttempt,
 }) => {
   return (
     <Card 
-      className="flex flex-col h-full overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out transform hover:-translate-y-1"
+      className="flex flex-col h-full overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out transform hover:-translate-y-1 group/productcard"
     >
-      <CardHeader className="p-0">
+      <CardHeader className="p-0 relative">
         {product.imageUrl && (
           <div className="aspect-[4/3] w-full relative overflow-hidden">
             <Image
@@ -29,7 +31,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
               alt={product.name}
               fill
               sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-              className="object-cover group-hover:scale-105 transition-transform duration-500 ease-in-out"
+              className="object-cover group-hover/productcard:scale-105 transition-transform duration-500 ease-in-out"
               data-ai-hint={product['data-ai-hint'] || 'food item'}
               priority={product.id === '1' || product.id === '2'} 
             />
@@ -65,10 +67,24 @@ const ProductCard: React.FC<ProductCardProps> = ({
             加入購物車
           </Button>
         )}
+        {onDeleteAttempt && (
+          <Button 
+            onClick={(e) => {
+              e.stopPropagation(); // Prevent any parent link navigation if this card is wrapped in a link
+              onDeleteAttempt(product.id, product.name);
+            }}
+            variant="outline" 
+            size="sm" 
+            className="w-full mt-1 border-destructive text-destructive hover:bg-destructive/10"
+            aria-label={`刪除產品 ${product.name}`}
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            刪除產品
+          </Button>
+        )}
       </CardFooter>
     </Card>
   );
 };
 
 export default ProductCard;
-
