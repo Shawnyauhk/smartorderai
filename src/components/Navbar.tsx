@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from 'next/link';
@@ -28,13 +29,14 @@ const Navbar = () => {
             {navItems.map((item) => (
               <Link key={item.href} href={item.href}>
                 <Button
-                  variant={pathname === item.href ? 'default' : 'ghost'}
+                  variant={pathname === item.href ? 'default' : 'outline'}
                   className={cn(
                     "font-medium transition-all duration-300 ease-in-out",
-                    "hover:bg-accent hover:text-accent-foreground",
+                    // For outline variant (not active), we want specific text color and keep its hover effects
+                    // For default variant (active), we apply scaling and shadow
                     pathname === item.href 
                       ? "bg-primary text-primary-foreground scale-105 shadow-lg" 
-                      : "text-foreground/80 hover:text-foreground"
+                      : "text-foreground/80 hover:bg-accent hover:text-accent-foreground" // Ensure outline button uses standard text color and correct hover
                   )}
                   aria-current={pathname === item.href ? 'page' : undefined}
                 >
@@ -51,3 +53,4 @@ const Navbar = () => {
 };
 
 export default Navbar;
+
