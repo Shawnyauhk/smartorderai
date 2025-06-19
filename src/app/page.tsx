@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useRef } from 'react'; 
+import { identifyLanguage } from '@/ai/flows/identify-language-flow.ts'; // New import
 import { parseOrder } from '@/ai/flows/parse-order.ts';
 import type { ParseOrderOutput, ParsedAiOrderItem } from '@/ai/flows/parse-order.ts';
 import type { CartItem, Product } from '@/types';
@@ -12,7 +13,7 @@ import PaymentSelector from '@/components/PaymentSelector';
 import ManualOrderSection from '@/components/ManualOrderSection';
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from '@/components/ui/separator';
-import { AlertCircle, Check, X, ShoppingCart, Edit3, CheckCircle, LayoutGrid } from 'lucide-react';
+import { AlertCircle, Check, X, ShoppingCart, Edit3, CheckCircle, LayoutGrid, Languages } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -28,6 +29,8 @@ export default function HomePage() {
   const [aiSuggestedItems, setAiSuggestedItems] = useState<ParsedAiOrderItem[]>([]);
   const [showAiConfirmation, setShowAiConfirmation] = useState(false);
   const [isManualOrderDialogOpen, setIsManualOrderDialogOpen] = useState(false);
+  const [processingStep, setProcessingStep] = useState<string | null>(null);
+
 
   const scrollableContentRef = useRef<HTMLDivElement | null>(null);
 
@@ -38,13 +41,38 @@ export default function HomePage() {
   };
 
   const handleOrderSubmit = async (orderText: string) => {
+    if (!orderText.trim()) {
+      toast({
+        title: "訂單空白",
+        description: "請輸入您的訂單詳情。",
+        variant: "destructive",
+      });
+      return;
+    }
     setIsProcessingOrder(true);
     setOrderAttempted(true);
     setShowAiConfirmation(false);
     setAiSuggestedItems([]);
-
+    
+    let identifiedLanguage = 'unknown';
     try {
-      const result: ParseOrderOutput = await parseOrder({ orderText });
+      setProcessingStep("正在識別語言...");
+      toast({ title: "處理中", description: "正在識別您輸入的語言..." });
+      const langResult = await identifyLanguage({ textToIdentify: orderText });
+      identifiedLanguage = langResult.identifiedLanguage || 'unknown';
+      
+      let languageDescription = identifiedLanguage;
+      if (identifiedLanguage === 'yue-Hant-HK') languageDescription = '廣東話';
+      else if (identifiedLanguage === 'cmn-Hans-CN') languageDescription = '普通話';
+      else if (identifiedLanguage === 'en-US') languageDescription = '英語';
+      else if (identifiedLanguage === 'mixed') languageDescription = '混合語言';
+      else languageDescription = '未知語言';
+
+      toast({ title: "語言識別結果", description: `AI 認為您的輸入主要是：${languageDescription}`});
+
+      setProcessingStep(`正在解析訂單 (語言: ${languageDescription})...`);
+      toast({ title: "處理中", description: `正在為您解析訂單 (已識別語言: ${languageDescription})` });
+      const result: ParseOrderOutput = await parseOrder({ orderText, inputLanguage: identifiedLanguage });
       
       if (!result || !result.orderItems || result.orderItems.length === 0) {
         toast({
@@ -53,20 +81,22 @@ export default function HomePage() {
           variant: "destructive",
         });
         setIsProcessingOrder(false);
+        setProcessingStep(null);
         return;
       }
       setAiSuggestedItems(result.orderItems);
       setShowAiConfirmation(true);
 
     } catch (error) {
-      console.error("Error parsing order:", error);
+      console.error("Error processing order:", error);
       toast({
         title: "AI處理錯誤",
-        description: "AI在解析您的訂單時遇到問題，請重試。",
+        description: `AI在處理您的訂單時遇到問題: ${(error as Error).message}`,
         variant: "destructive",
       });
     } finally {
       setIsProcessingOrder(false);
+      setProcessingStep(null);
     }
   };
 
@@ -309,9 +339,11 @@ export default function HomePage() {
     <div className="space-y-12">
       <OrderForm onOrderSubmit={handleOrderSubmit} isProcessing={isProcessingOrder} />
       
-      {isProcessingOrder && (
+      {isProcessingOrder && processingStep && (
          <div className="text-center py-8">
-            <p className="text-lg text-muted-foreground animate-pulse">AI正在努力為您分析訂單...</p>
+            <p className="text-lg text-muted-foreground animate-pulse flex items-center justify-center">
+                <Languages className="w-6 h-6 mr-2 animate-spin" /> {processingStep}
+            </p>
          </div>
       )}
 
@@ -445,11 +477,3 @@ export default function HomePage() {
   );
 }
     
-
-    
-
-
-
-
-    
-
