@@ -2,13 +2,19 @@
 "use client";
 
 import Link from 'next/link';
-import { Home, ShoppingBasket, Settings } from 'lucide-react';
+import { ShoppingBasket, Settings } from 'lucide-react'; // Removed unused Home icon
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from './ui/button';
+import { useState, useEffect } from 'react'; // Import useState and useEffect
 
 const Navbar = () => {
   const pathname = usePathname();
+  const [isMounted, setIsMounted] = useState(false); // Add mounted state
+
+  useEffect(() => {
+    setIsMounted(true); // Set to true once component mounts on client
+  }, []);
 
   const navItems = [
     { href: '/', label: '點餐', icon: ShoppingBasket },
@@ -26,25 +32,29 @@ const Navbar = () => {
             <h1 className="text-3xl font-headline font-bold text-primary group-hover:text-accent transition-colors duration-300">智能點餐AI</h1>
           </Link>
           <div className="flex items-center space-x-2 sm:space-x-4">
-            {navItems.map((item) => (
-              <Link key={item.href} href={item.href}>
-                <Button
-                  variant={pathname === item.href ? 'default' : 'outline'}
-                  className={cn(
-                    "font-medium transition-all duration-300 ease-in-out",
-                    // For outline variant (not active), we want specific text color and keep its hover effects
-                    // For default variant (active), we apply scaling and shadow
-                    pathname === item.href 
-                      ? "bg-primary text-primary-foreground scale-105 shadow-lg" 
-                      : "text-foreground/80 hover:bg-accent hover:text-accent-foreground" // Ensure outline button uses standard text color and correct hover
-                  )}
-                  aria-current={pathname === item.href ? 'page' : undefined}
-                >
-                  <item.icon className="mr-0 sm:mr-2 h-5 w-5" />
-                  <span className="hidden sm:inline">{item.label}</span>
-                </Button>
-              </Link>
-            ))}
+            {navItems.map((item) => {
+              // On the server and initial client render, isMounted is false, so isActive is false.
+              // After client hydration, isMounted becomes true, and isActive is correctly determined.
+              const isActive = isMounted && pathname === item.href;
+              
+              return (
+                <Link key={item.href} href={item.href}>
+                  <Button
+                    variant={isActive ? 'default' : 'outline'}
+                    className={cn(
+                      "font-medium transition-all duration-300 ease-in-out",
+                      isActive
+                        ? "bg-primary text-primary-foreground scale-105 shadow-lg" 
+                        : "text-foreground/80 hover:bg-accent hover:text-accent-foreground" 
+                    )}
+                    aria-current={isActive ? 'page' : undefined}
+                  >
+                    <item.icon className="mr-0 sm:mr-2 h-5 w-5" />
+                    <span className="hidden sm:inline">{item.label}</span>
+                  </Button>
+                </Link>
+              );
+            })}
           </div>
         </div>
       </nav>
