@@ -195,7 +195,7 @@ export default function AdminProductsPage() {
       });
       
       const finalOrderedCategories = [];
-      const categoriesInProductsSet = new Set(initialCategories.map(c => c.name));
+      //const categoriesInProductsSet = new Set(initialCategories.map(c => c.name));
 
       for (const name of storedOrderedNames) {
         const category = initialCategories.find(c => c.name === name);
@@ -438,16 +438,13 @@ export default function AdminProductsPage() {
         if (data && Array.isArray(data.orderedNames)) { 
           currentOrderedNames = data.orderedNames.filter((name): name is string => typeof name === 'string' && name.trim() !== '');
         } else {
-          console.warn(`'orderedNames' in ${CATEGORY_ORDER_DOC_ID} is not an array or document data is null/malformed. Initializing as empty array for new category addition.`);
           currentOrderedNames = [];
         }
       }
       
       if (!Array.isArray(currentOrderedNames)) {
-           console.warn(`'orderedNames' was not an array, resetting to empty array before adding new category: ${trimmedName}`);
            currentOrderedNames = [];
       }
-
 
       if (!currentOrderedNames.includes(trimmedName)) {
         currentOrderedNames.push(trimmedName);
@@ -481,20 +478,21 @@ export default function AdminProductsPage() {
       const productsCol = collection(db, 'products');
       const batch = writeBatch(db);
 
-      mockProducts.forEach((product, index) => { // Added index here
+      mockProducts.forEach((product: Product, index: number) => {
         const productIdString = String(product.id); 
         const productRef = doc(productsCol, productIdString);
         
+        // Ensure the product object being set matches the Product type, especially the 'order' field
         const productDataForFirestore: Product = {
-          ...product,
-          id: productIdString, 
-          price: Number(product.price) || 0, 
+          id: productIdString,
           name: String(product.name),
+          price: Number(product.price) || 0,
           category: String(product.category),
           description: product.description || '',
           imageUrl: product.imageUrl || `https://placehold.co/300x200.png`,
           'data-ai-hint': product['data-ai-hint'] || product.name.toLowerCase().split(' ').slice(0,2).join(' ') || 'food item',
-          order: index, // Assign index from mockProducts as the initial order
+          order: product.order, // Use order from mockProducts if available, otherwise fallback to index
+          options: product.options || [],
         };
         batch.set(productRef, productDataForFirestore);
       });
@@ -517,12 +515,14 @@ export default function AdminProductsPage() {
       let updatedOrderedNames = existingOrderedNames.filter(name => uniqueCategoriesFromSeed.includes(name));
       
       const newlyAddedCategoriesFromSeed = uniqueCategoriesFromSeed.filter(name => !updatedOrderedNames.includes(name));
-      newlyAddedCategoriesFromSeed.sort((a,b) => a.name.localeCompare(b.name, 'zh-HK')); 
+      // Sort newly added categories alphabetically (or by preferred locale) before appending
+      newlyAddedCategoriesFromSeed.sort((a,b) => a.localeCompare(b, 'zh-HK'));
       
       updatedOrderedNames.push(...newlyAddedCategoriesFromSeed);
       
+      // If updatedOrderedNames is still empty but uniqueCategoriesFromSeed is not, initialize with sorted uniqueCategoriesFromSeed
       if (updatedOrderedNames.length === 0 && uniqueCategoriesFromSeed.length > 0) {
-          uniqueCategoriesFromSeed.sort((a,b) => a.name.localeCompare(b.name, 'zh-HK'));
+          uniqueCategoriesFromSeed.sort((a,b) => a.localeCompare(b, 'zh-HK')); // Ensure this sort is consistent
           updatedOrderedNames = [...uniqueCategoriesFromSeed];
       }
       
