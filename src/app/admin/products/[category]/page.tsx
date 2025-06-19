@@ -6,7 +6,7 @@ import ProductCard from '@/components/ProductCard';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { ArrowLeftCircle, ListOrdered, GripVertical, Trash2, Loader2 } from 'lucide-react';
+import { ArrowLeftCircle, ListOrdered, GripVertical, Trash2, Loader2, PlusCircle } from 'lucide-react';
 import type { Product } from '@/types';
 import {
   DndContext,
@@ -181,7 +181,7 @@ export default function CategoryProductsPage({ params: paramsPromise }: Props) {
   return (
     <div className="space-y-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
+        <div className="flex-grow">
           <Button variant="outline" size="sm" asChild className="mb-4">
             <Link href="/admin/products">
               <ArrowLeftCircle className="mr-2 h-4 w-4" />
@@ -196,6 +196,12 @@ export default function CategoryProductsPage({ params: paramsPromise }: Props) {
             瀏覽 {decodedCategory} 系列中的所有產品。您可以拖動卡片調整產品順序，編輯或刪除產品。
           </p>
         </div>
+        <Button size="lg" asChild className="shadow-md hover:shadow-lg transition-shadow transform hover:scale-105 self-start sm:self-auto mt-4 sm:mt-0">
+          <Link href="/admin/products/add">
+            <PlusCircle className="mr-2 h-5 w-5" />
+            新增產品
+          </Link>
+        </Button>
       </div>
       
       <Separator />
