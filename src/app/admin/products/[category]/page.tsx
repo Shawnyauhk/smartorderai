@@ -67,7 +67,7 @@ function SortableProductItem({ product, onDeleteAttempt }: SortableProductItemPr
 
   return (
     <div ref={setNodeRef} style={style} className="relative touch-manipulation group/sortableitem">
-      <ProductCard product={product} onDeleteAttempt={onDeleteAttempt} />
+      <ProductCard product={product} onDeleteAttempt={onDeleteAttempt} showAdminControls={true} />
       <button
         {...attributes}
         {...listeners}
@@ -193,7 +193,7 @@ export default function CategoryProductsPage({ params: paramsPromise }: Props) {
             {decodedCategory}
           </h1>
           <p className="text-lg text-muted-foreground mt-1">
-            瀏覽 {decodedCategory} 系列中的所有產品。您可以拖動卡片調整產品順序，或刪除產品。
+            瀏覽 {decodedCategory} 系列中的所有產品。您可以拖動卡片調整產品順序，編輯或刪除產品。
           </p>
         </div>
       </div>

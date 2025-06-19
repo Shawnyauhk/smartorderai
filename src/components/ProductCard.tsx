@@ -5,19 +5,22 @@ import type { Product } from '@/types';
 import Image from 'next/image';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { DollarSign, Tag, PlusCircle, Trash2 } from 'lucide-react';
+import { DollarSign, Tag, PlusCircle, Trash2, Edit3 } from 'lucide-react';
 import { Button } from './ui/button';
+import Link from 'next/link';
 
 interface ProductCardProps {
   product: Product;
   onAddToCart?: (product: Product) => void;
-  onDeleteAttempt?: (productId: string, productName: string) => void; // New prop
+  onDeleteAttempt?: (productId: string, productName: string) => void;
+  showAdminControls?: boolean; // To show Edit/Delete buttons
 }
 
 const ProductCard: React.FC<ProductCardProps> = ({ 
   product,
   onAddToCart,
   onDeleteAttempt,
+  showAdminControls = false,
 }) => {
   return (
     <Card 
@@ -27,15 +30,33 @@ const ProductCard: React.FC<ProductCardProps> = ({
         {product.imageUrl && (
           <div className="aspect-[4/3] w-full relative overflow-hidden">
             <Image
-              src={product.imageUrl}
+              src={product.imageUrl || 'https://placehold.co/300x200.png'}
               alt={product.name}
               fill
               sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
               className="object-cover group-hover/productcard:scale-105 transition-transform duration-500 ease-in-out"
               data-ai-hint={product['data-ai-hint'] || 'food item'}
               priority={product.id === '1' || product.id === '2'} 
+              onError={(e) => {
+                // Fallback for broken images
+                const target = e.target as HTMLImageElement;
+                target.onerror = null; // Prevent infinite loop if placeholder also fails
+                target.src = `https://placehold.co/300x200.png?text=${encodeURIComponent(product.name)}`;
+              }}
             />
           </div>
+        )}
+        {!product.imageUrl && (
+           <div className="aspect-[4/3] w-full relative overflow-hidden bg-muted flex items-center justify-center">
+            <Image
+                src={`https://placehold.co/300x200.png?text=${encodeURIComponent(product.name)}`}
+                alt={product.name}
+                width={300}
+                height={200}
+                className="object-contain"
+                data-ai-hint={product['data-ai-hint'] || 'food item'}
+            />
+           </div>
         )}
       </CardHeader>
       <CardContent className="p-4 flex-grow">
@@ -67,20 +88,35 @@ const ProductCard: React.FC<ProductCardProps> = ({
             加入購物車
           </Button>
         )}
-        {onDeleteAttempt && (
-          <Button 
-            onClick={(e) => {
-              e.stopPropagation(); // Prevent any parent link navigation if this card is wrapped in a link
-              onDeleteAttempt(product.id, product.name);
-            }}
-            variant="outline" 
-            size="sm" 
-            className="w-full mt-1 border-destructive text-destructive hover:bg-destructive/10"
-            aria-label={`刪除產品 ${product.name}`}
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            刪除產品
-          </Button>
+        {showAdminControls && (
+          <div className="grid grid-cols-2 gap-2 mt-1">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="w-full border-blue-500 text-blue-600 hover:bg-blue-500/10 hover:text-blue-700"
+              asChild
+            >
+              <Link href={`/admin/products/edit/${product.id}`}>
+                <Edit3 className="mr-2 h-4 w-4" />
+                編輯
+              </Link>
+            </Button>
+            {onDeleteAttempt && (
+              <Button 
+                onClick={(e) => {
+                  e.stopPropagation(); 
+                  onDeleteAttempt(product.id, product.name);
+                }}
+                variant="outline" 
+                size="sm" 
+                className="w-full border-destructive text-destructive hover:bg-destructive/10"
+                aria-label={`刪除產品 ${product.name}`}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                刪除
+              </Button>
+            )}
+          </div>
         )}
       </CardFooter>
     </Card>
