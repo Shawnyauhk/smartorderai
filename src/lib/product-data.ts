@@ -42,7 +42,7 @@ export const mockProducts: Product[] = [
     id: '5',
     name: '豆花大滿貫',
     price: 49.00,
-    category: '豆花系列',
+    category: '豆花系列', // Corrected
     imageUrl: 'https://placehold.co/300x200.png',
     "data-ai-hint": 'tofu pudding',
     description: '配料豐富的豆花大滿貫。'
@@ -51,7 +51,7 @@ export const mockProducts: Product[] = [
     id: '6',
     name: '豆花五號',
     price: 36.00,
-    category: '豆花系列',
+    category: '豆花系列', // Corrected
     imageUrl: 'https://placehold.co/300x200.png',
     "data-ai-hint": 'dessert bowl',
     description: '特色豆花甜品。'
@@ -60,7 +60,7 @@ export const mockProducts: Product[] = [
     id: '7',
     name: '豆花四號',
     price: 36.00,
-    category: '豆花系列',
+    category: '豆花系列', // Corrected
     imageUrl: 'https://placehold.co/300x200.png',
     "data-ai-hint": 'dessert bowl',
     description: '特色豆花甜品。'
@@ -69,7 +69,7 @@ export const mockProducts: Product[] = [
     id: '8',
     name: '豆花三號',
     price: 36.00,
-    category: '豆花系列',
+    category: '豆花系列', // Corrected
     imageUrl: 'https://placehold.co/300x200.png',
     "data-ai-hint": 'dessert bowl',
     description: '特色豆花甜品。'
@@ -78,7 +78,7 @@ export const mockProducts: Product[] = [
     id: '9',
     name: '豆花二號',
     price: 36.00,
-    category: '豆花系列',
+    category: '豆花系列', // Corrected
     imageUrl: 'https://placehold.co/300x200.png',
     "data-ai-hint": 'dessert bowl',
     description: '特色豆花甜品。'
@@ -87,7 +87,7 @@ export const mockProducts: Product[] = [
     id: '10',
     name: '豆花一號',
     price: 38.00,
-    category: '豆花系列',
+    category: '豆花系列', // Corrected
     imageUrl: 'https://placehold.co/300x200.png',
     "data-ai-hint": 'dessert bowl',
     description: '特色豆花甜品。'
@@ -96,7 +96,7 @@ export const mockProducts: Product[] = [
     id: '11',
     name: '仙草大滿貫',
     price: 49.00,
-    category: '仙草系列',
+    category: '仙草系列', // Corrected
     imageUrl: 'https://placehold.co/300x200.png',
     "data-ai-hint": 'grass jelly',
     description: '配料豐富的仙草大滿貫。'
@@ -105,7 +105,7 @@ export const mockProducts: Product[] = [
     id: '12',
     name: '仙草五號（仙草，地瓜圓，芋圓，紫米，椰果）',
     price: 36.00,
-    category: '仙草系列',
+    category: '仙草系列', // Corrected
     imageUrl: 'https://placehold.co/300x200.png',
     "data-ai-hint": 'grass jelly',
     description: '仙草，地瓜圓，芋圓，紫米，椰果。'
@@ -114,7 +114,7 @@ export const mockProducts: Product[] = [
     id: '13',
     name: '仙草四號（仙草，地瓜圓，芋圓，小丸子，蜜紅豆）',
     price: 36.00,
-    category: '仙草系列',
+    category: '仙草系列', // Corrected
     imageUrl: 'https://placehold.co/300x200.png',
     "data-ai-hint": 'grass jelly',
     description: '仙草，地瓜圓，芋圓，小丸子，蜜紅豆。'
@@ -123,7 +123,7 @@ export const mockProducts: Product[] = [
     id: '14',
     name: '仙草三號（仙草，地瓜圓，芋圓，珍珠，椰果）',
     price: 36.00,
-    category: '仙草系列',
+    category: '仙草系列', // Corrected
     imageUrl: 'https://placehold.co/300x200.png',
     "data-ai-hint": 'grass jelly',
     description: '仙草，地瓜圓，芋圓，珍珠，椰果。'
@@ -132,7 +132,7 @@ export const mockProducts: Product[] = [
     id: '15',
     name: '仙草二號（仙草，地瓜圓，芋圓，黑糖粉條，珍珠）',
     price: 36.00,
-    category: '仙草系列',
+    category: '仙草系列', // Corrected
     imageUrl: 'https://placehold.co/300x200.png',
     "data-ai-hint": 'grass jelly',
     description: '仙草，地瓜圓，芋圓，黑糖粉條，珍珠。'
@@ -141,7 +141,7 @@ export const mockProducts: Product[] = [
     id: '16',
     name: '仙草一號 （仙草，地瓜圓，芋圓，蜜紅豆，芋泥）',
     price: 38.00,
-    category: '仙草系列',
+    category: '仙草系列', // Corrected
     imageUrl: 'https://placehold.co/300x200.png',
     "data-ai-hint": 'grass jelly',
     description: '仙草，地瓜圓，芋圓，蜜紅豆，芋泥。'
@@ -828,9 +828,4 @@ export const findProductByName = (name: string): Product | undefined => {
   // This is more reliable for Chinese names where case-insensitivity is not standard.
   return mockProducts.find(p => p.name.trim() === name.trim());
 };
-
-    
-
-    
-
     
