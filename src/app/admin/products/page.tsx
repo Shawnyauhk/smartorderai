@@ -161,13 +161,11 @@ export default function AdminProductsPage() {
         storedOrderedNames = orderDocSnap.data()?.orderedNames || [];
       }
       
-      // Add any new categories from products that are not yet in storedOrderedNames to categoriesMap (with count 0 if necessary)
       storedOrderedNames.forEach(name => {
         if (!categoriesMap[name]) {
-          categoriesMap[name] = 0; // Add to map if it was in stored order but has no products
+          categoriesMap[name] = 0; 
         }
       });
-      // Rebuild initialCategories to include categories from storedOrder that might be empty
        initialCategories = Object.entries(categoriesMap)
         .map(([name, count]) => ({ id: name, name, count }));
 
@@ -423,7 +421,7 @@ export default function AdminProductsPage() {
 
       setNewCategoryDialogOpen(false);
       setNewCategoryNameForCreation('');
-      setRefreshKey(prev => prev + 1); // Refresh data to show the new category
+      setRefreshKey(prev => prev + 1); 
     } catch (error) {
       console.error(`Error creating new category ${trimmedName}:`, error);
       toast({
@@ -433,6 +431,69 @@ export default function AdminProductsPage() {
       });
     } finally {
       setIsCreatingCategory(false);
+    }
+  };
+
+  const handleSeedDatabase = async () => {
+    setIsSeeding(true);
+    try {
+      const productsCol = collection(db, 'products');
+      const batch = writeBatch(db);
+
+      for (const product of mockProducts) {
+        // Ensure product.id is a string, as Firestore document IDs must be strings.
+        const productIdString = String(product.id); 
+        const productRef = doc(productsCol, productIdString);
+        
+        // Make a copy of the product to avoid modifying the original mockProducts array
+        // and ensure all fields are correctly typed for Firestore.
+        const productDataForFirestore: Product = {
+          ...product,
+          id: productIdString, // ensure id is string
+          price: Number(product.price) || 0, // ensure price is number
+          name: String(product.name),
+          category: String(product.category),
+          description: product.description || '',
+          imageUrl: product.imageUrl || `https://placehold.co/300x200.png?text=${encodeURIComponent(product.name)}`,
+          'data-ai-hint': product['data-ai-hint'] || product.name.toLowerCase().split(' ').slice(0,2).join(' ') || 'food item',
+        };
+        batch.set(productRef, productDataForFirestore);
+      }
+
+      await batch.commit();
+
+      // Also update category order
+      const uniqueCategoriesFromSeed = Array.from(new Set(mockProducts.map(p => p.category.trim()).filter(Boolean)));
+      const orderDocRef = doc(db, CATEGORY_ORDER_COLLECTION, CATEGORY_ORDER_DOC_ID);
+      const orderDocSnap = await getDoc(orderDocRef);
+      let currentOrderedNames: string[] = [];
+      if (orderDocSnap.exists()) {
+        currentOrderedNames = orderDocSnap.data()?.orderedNames || [];
+      }
+      
+      uniqueCategoriesFromSeed.forEach(seededCategory => {
+        if (!currentOrderedNames.includes(seededCategory)) {
+          currentOrderedNames.push(seededCategory);
+        }
+      });
+      await setDoc(orderDocRef, { orderedNames: currentOrderedNames }, { merge: true });
+
+
+      toast({
+        title: "模擬數據導入成功！",
+        description: `${mockProducts.length} 項模擬產品已成功導入到資料庫。`,
+        className: "bg-green-500 text-white border-green-600",
+      });
+      setRefreshKey(prev => prev + 1); 
+    } catch (error) {
+      console.error("Error seeding database:", error);
+      toast({
+        title: "導入模擬數據失敗",
+        description: `導入模擬產品時發生錯誤: ${(error as Error).message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSeeding(false);
     }
   };
 
@@ -651,4 +712,3 @@ export default function AdminProductsPage() {
     </div>
   );
 }
-
