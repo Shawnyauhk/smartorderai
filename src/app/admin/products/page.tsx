@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { PlusCircle, FolderKanban, GripVertical, DatabaseZap, Loader2, BrainCircuit, Trash2 } from 'lucide-react';
+import { PlusCircle, FolderKanban, GripVertical, DatabaseZap, Loader2, BrainCircuit, Trash2, Edit3 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import type { Product } from '@/types';
 import {
@@ -40,6 +40,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 type CategoryEntry = { id: string; name: string; count: number };
 
@@ -47,9 +49,10 @@ interface SortableCategoryCardProps {
   categoryItem: CategoryEntry;
   children: React.ReactNode;
   onDeleteRequest: (category: CategoryEntry) => void;
+  onEditRequest: (category: CategoryEntry) => void;
 }
 
-function SortableCategoryCard({ categoryItem, children, onDeleteRequest }: SortableCategoryCardProps) {
+function SortableCategoryCard({ categoryItem, children, onDeleteRequest, onEditRequest }: SortableCategoryCardProps) {
   const {
     attributes,
     listeners,
@@ -69,26 +72,41 @@ function SortableCategoryCard({ categoryItem, children, onDeleteRequest }: Sorta
   return (
     <div ref={setNodeRef} style={style} className="relative touch-manipulation group/categorycard">
       {children}
-      <button
-        {...attributes}
-        {...listeners}
-        className="absolute top-2 right-10 p-1 text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing opacity-0 group-hover/categorycard:opacity-100 transition-opacity"
-        aria-label={`拖動排序 ${categoryItem.name}`}
-      >
-        <GripVertical className="h-5 w-5" />
-      </button>
-      <Button 
-          variant="ghost" 
-          size="icon" 
-          className="absolute top-1 right-1 p-1 text-destructive hover:bg-destructive/10 opacity-0 group-hover/categorycard:opacity-100 transition-opacity"
-          onClick={(e) => {
-            e.stopPropagation(); 
-            onDeleteRequest(categoryItem);
-          }}
-          aria-label={`刪除系列 ${categoryItem.name}`}
-          >
-          <Trash2 className="h-5 w-5" />
-      </Button>
+      {/* Admin Controls Toolbar */}
+      <div className="absolute top-2 right-2 flex flex-col gap-1.5 opacity-0 group-hover/categorycard:opacity-100 transition-opacity z-10">
+        <button
+          {...attributes}
+          {...listeners}
+          className="p-1.5 text-muted-foreground bg-card/80 backdrop-blur-sm rounded-md hover:text-foreground cursor-grab active:cursor-grabbing shadow"
+          aria-label={`拖動排序 ${categoryItem.name}`}
+        >
+          <GripVertical className="h-5 w-5" />
+        </button>
+        <Button
+            variant="outline"
+            size="icon"
+            className="p-1.5 h-auto w-auto border-blue-500 text-blue-600 hover:bg-blue-500/10 hover:text-blue-700 bg-card/80 backdrop-blur-sm rounded-md shadow"
+            onClick={(e) => {
+                e.stopPropagation();
+                onEditRequest(categoryItem);
+            }}
+            aria-label={`編輯系列 ${categoryItem.name}`}
+        >
+            <Edit3 className="h-4 w-4" />
+        </Button>
+        <Button 
+            variant="outline"
+            size="icon" 
+            className="p-1.5 h-auto w-auto border-destructive text-destructive hover:bg-destructive/10 bg-card/80 backdrop-blur-sm rounded-md shadow"
+            onClick={(e) => {
+              e.stopPropagation(); 
+              onDeleteRequest(categoryItem);
+            }}
+            aria-label={`刪除系列 ${categoryItem.name}`}
+            >
+            <Trash2 className="h-4 w-4" />
+        </Button>
+      </div>
     </div>
   );
 }
@@ -103,24 +121,32 @@ export default function AdminProductsPage() {
   const [categoryToDelete, setCategoryToDelete] = useState<CategoryEntry | null>(null);
   const [isDeletingCategory, setIsDeletingCategory] = useState(false);
 
+  const [categoryToEdit, setCategoryToEdit] = useState<CategoryEntry | null>(null);
+  const [newCategoryNameInput, setNewCategoryNameInput] = useState('');
+  const [isEditingCategoryName, setIsEditingCategoryName] = useState(false);
+
+
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
       const productsCol = collection(db, 'products');
-      const productsSnapshot = await getDocs(query(productsCol));
+      const productsSnapshot = await getDocs(query(productsCol)); // Consider adding orderBy here if needed, or rely on client-side sort
       const fetchedProducts: Product[] = productsSnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Product));
 
       const categoriesMap = fetchedProducts.reduce((acc, product) => {
-        if (!product.category) return acc;
-        if (!acc[product.category]) {
-          acc[product.category] = 0;
+        if (!product.category) return acc; // Skip products without a category
+        const categoryName = product.category.trim();
+        if (!categoryName) return acc; // Skip products with empty string category
+
+        if (!acc[categoryName]) {
+          acc[categoryName] = 0;
         }
-        acc[product.category]++;
+        acc[categoryName]++;
         return acc;
       }, {} as Record<string, number>);
 
       const initialCategories = Object.entries(categoriesMap)
-        .map(([name, count]) => ({ id: name, name, count }))
+        .map(([name, count]) => ({ id: name, name, count })) // id is name for DNDKit key
         .sort((a, b) => a.name.localeCompare(b.name, 'zh-HK'));
 
       setOrderedCategories(initialCategories);
@@ -215,6 +241,70 @@ export default function AdminProductsPage() {
     }
   };
 
+  const handleRequestEditCategory = (category: CategoryEntry) => {
+    setCategoryToEdit(category);
+    setNewCategoryNameInput(category.name); // Pre-fill input with current name
+  };
+
+  const handleConfirmEditCategory = async () => {
+    if (!categoryToEdit || !newCategoryNameInput.trim()) {
+      toast({ title: "錯誤", description: "新系列名稱不能為空。", variant: "destructive" });
+      return;
+    }
+    const newName = newCategoryNameInput.trim();
+    if (newName === categoryToEdit.name) {
+      toast({ title: "提示", description: "新舊系列名稱相同，無需修改。", variant: "default" });
+      setCategoryToEdit(null); // Close dialog
+      return;
+    }
+     // Check for name collision with other existing categories
+    if (orderedCategories.some(cat => cat.name === newName && cat.id !== categoryToEdit.id)) {
+      toast({ title: "錯誤", description: `系列名稱 "${newName}" 已存在。請使用不同的名稱。`, variant: "destructive" });
+      return;
+    }
+
+    setIsEditingCategoryName(true);
+    const oldCategoryName = categoryToEdit.name;
+    const oldCategoryId = categoryToEdit.id;
+
+    try {
+      const productsCol = collection(db, 'products');
+      const q = query(productsCol, where('category', '==', oldCategoryName));
+      const productsSnapshot = await getDocs(q);
+
+      if (!productsSnapshot.empty) {
+        const batch = writeBatch(db);
+        productsSnapshot.docs.forEach((productDoc) => {
+          batch.update(doc(db, 'products', productDoc.id), { category: newName });
+        });
+        await batch.commit();
+      }
+
+      setOrderedCategories(prev =>
+        prev.map(cat =>
+          cat.id === oldCategoryId ? { ...cat, name: newName, id: newName } : cat // Update name and id
+        ).sort((a, b) => a.name.localeCompare(b.name, 'zh-HK')) // Re-sort
+      );
+
+      toast({
+        title: "系列名稱更新成功",
+        description: `系列 "${oldCategoryName}" 已成功更名為 "${newName}"。`,
+        className: "bg-green-500 text-white border-green-600",
+      });
+    } catch (error) {
+      console.error(`Error updating category name for ${oldCategoryName}:`, error);
+      toast({
+        title: "更新系列名稱失敗",
+        description: `更新系列名稱時發生錯誤。請重試。錯誤: ${(error as Error).message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsEditingCategoryName(false);
+      setCategoryToEdit(null);
+      setNewCategoryNameInput('');
+    }
+  };
+
 
   const handleSeedDatabase = useCallback(async () => {
     setIsSeeding(true);
@@ -276,7 +366,7 @@ export default function AdminProductsPage() {
             產品系列
           </h1>
           <p className="text-lg text-muted-foreground mt-1">
-            選擇一個系列以查看詳細產品。您可以拖動卡片調整系列順序，或刪除系列。
+            選擇一個系列以查看詳細產品。您可以拖動卡片調整系列順序，或編輯/刪除系列。
           </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 items-stretch">
@@ -320,6 +410,7 @@ export default function AdminProductsPage() {
 
       <Separator />
 
+      {/* Delete Category Dialog */}
       <AlertDialog open={!!categoryToDelete} onOpenChange={(open) => !open && setCategoryToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -343,6 +434,41 @@ export default function AdminProductsPage() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Edit Category Name Dialog */}
+      <AlertDialog open={!!categoryToEdit} onOpenChange={(open) => { if (!open) { setCategoryToEdit(null); setNewCategoryNameInput(''); }}}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>編輯系列名稱</AlertDialogTitle>
+            <AlertDialogDescription>
+              為系列「{categoryToEdit?.name}」輸入新的名稱。此操作將更新此系列下所有產品的分類。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-2 space-y-2">
+            <Label htmlFor="newCategoryName" className="text-sm font-medium">
+              新系列名稱*
+            </Label>
+            <Input
+              id="newCategoryName"
+              value={newCategoryNameInput}
+              onChange={(e) => setNewCategoryNameInput(e.target.value)}
+              placeholder="輸入新的系列名稱"
+              autoFocus
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => { setCategoryToEdit(null); setNewCategoryNameInput(''); }}>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmEditCategory}
+              disabled={isEditingCategoryName || !newCategoryNameInput.trim() || newCategoryNameInput.trim() === categoryToEdit?.name}
+            >
+              {isEditingCategoryName && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              確認更新
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+
       {isLoading ? (
         <div className="text-center py-12">
           <Loader2 className="mx-auto h-12 w-12 text-primary animate-spin mb-4" />
@@ -355,16 +481,27 @@ export default function AdminProductsPage() {
           onDragEnd={handleDragEnd}
         >
           <SortableContext
-            items={orderedCategories.map(c => c.id)}
+            items={orderedCategories.map(c => c.id)} // Ensure ID is stable and unique
             strategy={verticalListSortingStrategy}
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {orderedCategories.map((categoryItem) => (
-                <SortableCategoryCard key={categoryItem.id} categoryItem={categoryItem} onDeleteRequest={handleRequestDeleteCategory}>
+                <SortableCategoryCard 
+                    key={categoryItem.id} 
+                    categoryItem={categoryItem} 
+                    onDeleteRequest={handleRequestDeleteCategory}
+                    onEditRequest={handleRequestEditCategory}
+                >
                   <Card className="h-full flex flex-col justify-between hover:shadow-lg transition-shadow duration-300 ease-in-out transform hover:-translate-y-1">
                     <Link
                       href={`/admin/products/${encodeURIComponent(categoryItem.name)}`}
                       className="block hover:no-underline flex-grow p-1"
+                      onClick={(e) => {
+                        // Prevent navigation if any of the buttons in the toolbar are active
+                        if ((e.target as HTMLElement).closest('button[aria-label*="系列"]') || (e.target as HTMLElement).closest('button[aria-label*="排序"]')) {
+                           e.preventDefault();
+                        }
+                      }}
                     >
                         <CardHeader>
                           <CardTitle className="text-2xl font-headline text-primary">{categoryItem.name}</CardTitle>
@@ -395,3 +532,4 @@ export default function AdminProductsPage() {
     </div>
   );
 }
+
