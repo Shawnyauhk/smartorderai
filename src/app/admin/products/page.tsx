@@ -167,6 +167,7 @@ export default function AdminProductsPage() {
         }
       }
       
+      // Ensure all categories from storedOrderedNames are present in categoriesMap, even if they have 0 products
       storedOrderedNames.forEach(name => {
         if (!categoriesMap[name]) { 
           categoriesMap[name] = 0; 
@@ -191,12 +192,12 @@ export default function AdminProductsPage() {
         if (indexB !== -1) {
           return 1; 
         }
+        // Fallback sort for categories not in storedOrderedNames
         return a.name.localeCompare(b.name, 'zh-HK');
       });
       
       const finalOrderedCategories = [];
-      //const categoriesInProductsSet = new Set(initialCategories.map(c => c.name));
-
+      // Add categories based on storedOrderedNames first
       for (const name of storedOrderedNames) {
         const category = initialCategories.find(c => c.name === name);
         if (category) {
@@ -204,9 +205,10 @@ export default function AdminProductsPage() {
         }
       }
 
+      // Add any remaining categories (those in products but not in storedOrder)
       const remainingCategories = initialCategories
         .filter(c => !storedOrderedNames.includes(c.name))
-        .sort((a,b) => a.name.localeCompare(b.name, 'zh-HK')); 
+        .sort((a,b) => a.name.localeCompare(b.name, 'zh-HK')); // Ensure these are also sorted
       
       finalOrderedCategories.push(...remainingCategories);
       
@@ -293,6 +295,7 @@ export default function AdminProductsPage() {
 
     setIsDeletingCategory(true);
     try {
+      // Delete all products within this category
       const productsCol = collection(db, 'products');
       const q = query(productsCol, where('category', '==', categoryToDelete.name));
       const productsSnapshot = await getDocs(q);
@@ -305,8 +308,10 @@ export default function AdminProductsPage() {
         await batch.commit();
       }
       
+      // Update local state for categories
       setOrderedCategories(prev => prev.filter(c => c.id !== categoryToDelete.id));
       
+      // Update categoryDisplayOrder in Firestore
       const orderDocRef = doc(db, CATEGORY_ORDER_COLLECTION, CATEGORY_ORDER_DOC_ID);
       const orderDocSnap = await getDoc(orderDocRef);
       if (orderDocSnap.exists()) {
@@ -363,6 +368,7 @@ export default function AdminProductsPage() {
     const oldCategoryName = categoryToEdit.name;
 
     try {
+      // Update category for all products in this category
       const productsCol = collection(db, 'products');
       const q = query(productsCol, where('category', '==', oldCategoryName));
       const productsSnapshot = await getDocs(q);
@@ -375,6 +381,7 @@ export default function AdminProductsPage() {
         await batch.commit();
       }
       
+      // Update categoryDisplayOrder in Firestore
       const orderDocRef = doc(db, CATEGORY_ORDER_COLLECTION, CATEGORY_ORDER_DOC_ID);
       const orderDocSnap = await getDoc(orderDocRef);
       let newOrderedNamesList = [];
@@ -383,10 +390,13 @@ export default function AdminProductsPage() {
         if (data && Array.isArray(data.orderedNames)) {
             newOrderedNamesList = data.orderedNames.map((name: string) => name === oldCategoryName ? newName : name);
         } else {
+            // If orderedNames is malformed, initialize with the new name if no products exist for it yet,
+            // or rely on loadData to reconstruct order based on product categories.
+            // For simplicity, we update it, and loadData will re-sort based on this.
             newOrderedNamesList = [newName]; 
         }
       } else {
-        newOrderedNamesList = [newName];
+        newOrderedNamesList = [newName]; // Create if doesn't exist
       }
       await setDoc(orderDocRef, { orderedNames: newOrderedNamesList }, { merge: true });
       
@@ -396,7 +406,7 @@ export default function AdminProductsPage() {
         className: "bg-green-500 text-white border-green-600",
       });
       
-      setRefreshKey(prev => prev + 1); 
+      setRefreshKey(prev => prev + 1); // Trigger data reload
 
     } catch (error) {
       console.error(`Error updating category name for ${oldCategoryName}:`, error);
@@ -429,20 +439,25 @@ export default function AdminProductsPage() {
     }
 
     try {
+      // Update categoryDisplayOrder in Firestore
       const orderDocRef = doc(db, CATEGORY_ORDER_COLLECTION, CATEGORY_ORDER_DOC_ID);
       const orderDocSnap = await getDoc(orderDocRef);
       
       let currentOrderedNames: string[] = [];
       if (orderDocSnap.exists()) {
         const data = orderDocSnap.data();
+        // Ensure data.orderedNames is an array, default to empty array if not
         if (data && Array.isArray(data.orderedNames)) { 
           currentOrderedNames = data.orderedNames.filter((name): name is string => typeof name === 'string' && name.trim() !== '');
         } else {
+          // If orderedNames doesn't exist or is not an array, initialize as empty
           currentOrderedNames = [];
         }
       }
       
+      // Ensure currentOrderedNames is always an array before push
       if (!Array.isArray(currentOrderedNames)) {
+           console.warn(`${CATEGORY_ORDER_DOC_ID} document's orderedNames was not an array. Reinitializing.`);
            currentOrderedNames = [];
       }
 
@@ -459,7 +474,7 @@ export default function AdminProductsPage() {
 
       setIsNewCategoryDialogOpen(false);
       setNewCategoryNameForCreation('');
-      setRefreshKey(prev => prev + 1); 
+      setRefreshKey(prev => prev + 1); // Trigger data reload
     } catch (error) {
       console.error(`Error creating new category ${trimmedName}:`, error);
       toast({
@@ -478,11 +493,10 @@ export default function AdminProductsPage() {
       const productsCol = collection(db, 'products');
       const batch = writeBatch(db);
 
-      mockProducts.forEach((product: Product, index: number) => {
+      mockProducts.forEach((product: Product) => { // No index needed if using product.order
         const productIdString = String(product.id); 
         const productRef = doc(productsCol, productIdString);
         
-        // Ensure the product object being set matches the Product type, especially the 'order' field
         const productDataForFirestore: Product = {
           id: productIdString,
           name: String(product.name),
@@ -491,7 +505,7 @@ export default function AdminProductsPage() {
           description: product.description || '',
           imageUrl: product.imageUrl || `https://placehold.co/300x200.png`,
           'data-ai-hint': product['data-ai-hint'] || product.name.toLowerCase().split(' ').slice(0,2).join(' ') || 'food item',
-          order: product.order, // Use order from mockProducts if available, otherwise fallback to index
+          order: product.order, // Use order from mockProducts directly
           options: product.options || [],
         };
         batch.set(productRef, productDataForFirestore);
@@ -499,6 +513,7 @@ export default function AdminProductsPage() {
 
       await batch.commit();
 
+      // Update categoryDisplayOrder based on mockProducts
       const uniqueCategoriesFromSeed = Array.from(new Set(mockProducts.map(p => p.category.trim()).filter(Boolean)));
       
       const orderDocRef = doc(db, CATEGORY_ORDER_COLLECTION, CATEGORY_ORDER_DOC_ID);
@@ -512,8 +527,10 @@ export default function AdminProductsPage() {
         }
       }
       
+      // Filter existingOrderedNames to only include those present in uniqueCategoriesFromSeed
       let updatedOrderedNames = existingOrderedNames.filter(name => uniqueCategoriesFromSeed.includes(name));
       
+      // Add new categories from seed data that are not already in updatedOrderedNames
       const newlyAddedCategoriesFromSeed = uniqueCategoriesFromSeed.filter(name => !updatedOrderedNames.includes(name));
       // Sort newly added categories alphabetically (or by preferred locale) before appending
       newlyAddedCategoriesFromSeed.sort((a,b) => a.localeCompare(b, 'zh-HK'));
@@ -522,19 +539,20 @@ export default function AdminProductsPage() {
       
       // If updatedOrderedNames is still empty but uniqueCategoriesFromSeed is not, initialize with sorted uniqueCategoriesFromSeed
       if (updatedOrderedNames.length === 0 && uniqueCategoriesFromSeed.length > 0) {
-          uniqueCategoriesFromSeed.sort((a,b) => a.localeCompare(b, 'zh-HK')); // Ensure this sort is consistent
-          updatedOrderedNames = [...uniqueCategoriesFromSeed];
+          // This case is covered by the newlyAddedCategories logic if existingOrderedNames was empty
+          // We can simplify: if uniqueCategoriesFromSeed has items, updatedOrderedNames will get them.
+          // If uniqueCategoriesFromSeed is empty, updatedOrderedNames remains empty (or filtered empty).
       }
       
       await setDoc(orderDocRef, { orderedNames: updatedOrderedNames });
 
       toast({
         title: "模擬數據導入成功！",
-        description: `${mockProducts.length} 項模擬產品已成功導入到資料庫（包含初始排序值），並且產品系列順序已根據模擬數據更新。`,
+        description: `${mockProducts.length} 項模擬產品已成功導入到資料庫（包含預設排序值），並且產品系列順序已根據模擬數據更新。`,
         className: "bg-green-500 text-white border-green-600",
         duration: 8000,
       });
-      setRefreshKey(prev => prev + 1); 
+      setRefreshKey(prev => prev + 1); // Trigger data reload
     } catch (error) {
       console.error("Error seeding database:", error);
       toast({
@@ -578,10 +596,10 @@ export default function AdminProductsPage() {
                 <AlertDialogHeader>
                   <AlertDialogTitle>確認導入模擬數據？</AlertDialogTitle>
                   <AlertDialogDescription>
-                    此操作將會把系統內建的模擬產品數據 (共 {mockProducts.length} 項) 導入到您的 Firebase Firestore 產品庫中，並為每個產品設定初始排序值。
-                    如果您的產品庫中已有同名產品，此操作可能會造成數據重複。
-                    同時，產品系列的顯示順序將會**根據模擬數據進行更新**，移除不存在於模擬數據中的舊系列名稱。
-                    建議在產品庫為空或僅作初步填充時使用，或在需要用模擬數據重置分類及產品排序時使用。
+                    此操作將會把系統內建的模擬產品數據 (共 {mockProducts.length} 項) 導入到您的 Firebase Firestore 產品庫中，並為每個產品設定其在模擬數據中定義的排序值。
+                    如果您的產品庫中已有相同 ID 的產品，此操作將會**覆蓋**它們。
+                    同時，產品系列的顯示順序將會根據模擬數據中存在的分類進行更新，移除不存在於模擬數據中的舊系列名稱。
+                    建議在產品庫為空或可安全覆蓋時使用。
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -754,10 +772,10 @@ export default function AdminProductsPage() {
           <DatabaseZap className="mx-auto h-16 w-16 text-muted-foreground mb-6" />
           <p className="text-xl font-headline text-primary mb-2">未找到任何產品系列</p>
           <p className="mt-2 text-foreground max-w-md mx-auto">
-            您的產品庫目前是空的。您可以透過「新增產品」按鈕手動加入產品，使用「從模擬數據導入產品」功能來快速填充產品庫，或使用「新增系列」來建立一個空的產品系列。
+            您的產品庫目前是空的，或者未能成功讀取。您可以透過「新增產品」按鈕手動加入產品，使用「從模擬數據導入產品」功能來快速填充產品庫（這將確保產品包含排序欄位），或使用「新增系列」來建立一個空的產品系列。
           </p>
            <p className="text-xs text-muted-foreground mt-4">
-            如果已導入或新增但仍未顯示，請檢查您的Firebase設定、Firestore安全性規則和資料庫連線，或嘗試使用「從模擬數據導入產品」功能來同步分類列表。
+            如果已導入或新增但仍未顯示，請檢查您的Firebase設定、Firestore安全性規則和資料庫連線，或嘗試使用「從模擬數據導入產品」功能來同步分類列表並確保產品包含必要的排序欄位。
           </p>
         </div>
       )}

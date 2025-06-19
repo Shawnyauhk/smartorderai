@@ -76,8 +76,8 @@ function SortableProductItem({ product, onDeleteAttempt, isSelected, onToggleSel
         onCheckedChange={() => onToggleSelection(product.id)}
         aria-label={`選擇 ${product.name}`}
         className="absolute top-3 left-3 z-20 bg-card/80 rounded-sm border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
-        onClick={(e) => e.stopPropagation()} // Prevent dnd-kit from capturing click
-        onKeyDown={(e) => { if (e.key === ' ') { e.stopPropagation(); } }} // Allow space to toggle
+        onClick={(e) => e.stopPropagation()} 
+        onKeyDown={(e) => { if (e.key === ' ') { e.stopPropagation(); } }} 
       />
       <ProductCard product={product} onDeleteAttempt={onDeleteAttempt} showAdminControls={true} />
       <button
@@ -94,7 +94,8 @@ function SortableProductItem({ product, onDeleteAttempt, isSelected, onToggleSel
 
 export default function CategoryProductsPage({ params: paramsPromise }: Props) {
   const params = use(paramsPromise);
-  const decodedCategory = decodeURIComponent(params.category);
+  // Ensure category name is trimmed for consistency in queries
+  const decodedCategory = decodeURIComponent(params.category).trim(); 
   const [orderedProducts, setOrderedProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSavingOrder, setIsSavingOrder] = useState(false);
@@ -113,9 +114,8 @@ export default function CategoryProductsPage({ params: paramsPromise }: Props) {
     setSelectedProductIds(new Set()); 
     try {
       const productsCol = collection(db, 'products');
-      // Order by the 'order' field first, then by 'name' as a fallback
       const q = query(productsCol, 
-        where('category', '==', decodedCategory), 
+        where('category', '==', decodedCategory), // Uses the trimmed decodedCategory
         orderBy('order', 'asc'),
         orderBy('name', 'asc') 
       );
@@ -142,7 +142,7 @@ export default function CategoryProductsPage({ params: paramsPromise }: Props) {
       } else {
         toast({
           title: "讀取產品失敗",
-          description: `無法從資料庫讀取 ${decodedCategory} 系列的產品。請檢查您的 Firebase 設定或網絡連線。`,
+          description: `無法從資料庫讀取 ${decodedCategory} 系列的產品。請檢查您的 Firebase 設定、資料庫中產品是否包含 'order' 欄位，或網絡連線。`,
           variant: "destructive",
         });
       }
@@ -157,7 +157,7 @@ export default function CategoryProductsPage({ params: paramsPromise }: Props) {
   }, [decodedCategory, fetchProducts]);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }), // Add distance constraint
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
@@ -186,8 +186,6 @@ export default function CategoryProductsPage({ params: paramsPromise }: Props) {
         description: "儲存產品排序時發生錯誤。請重試。",
         variant: "destructive",
       });
-      // Optionally, refetch products to revert to last saved order
-      // fetchProducts(); 
     } finally {
       setIsSavingOrder(false);
     }
@@ -200,11 +198,13 @@ export default function CategoryProductsPage({ params: paramsPromise }: Props) {
       setOrderedProducts((items) => {
         const oldIndex = items.findIndex((item) => item.id === active.id);
         const newIndex = items.findIndex((item) => item.id === over.id);
-        if (oldIndex === -1 || newIndex === -1) return items; // Should not happen
+        if (oldIndex === -1 || newIndex === -1) return items;
         
         const movedItems = arrayMove(items, oldIndex, newIndex);
-        saveProductOrder(movedItems); // Save the new order
-        return movedItems;
+        // Update order for all items in the list, not just the moved one
+        const itemsToSave = movedItems.map((item, index) => ({ ...item, order: index }));
+        saveProductOrder(itemsToSave); 
+        return movedItems; // Return items without locally setting new order, let saveProductOrder handle source of truth after Firestore update
       });
     }
   }
@@ -218,9 +218,6 @@ export default function CategoryProductsPage({ params: paramsPromise }: Props) {
     setIsDeletingProduct(true);
     try {
       await deleteDoc(doc(db, 'products', productToDelete.id));
-      // No need to manually filter here, as fetchProducts will be called if products change,
-      // or the order will be re-saved if deletion affects order.
-      // For immediate UI update:
       setOrderedProducts(prev => prev.filter(p => p.id !== productToDelete.id));
       setSelectedProductIds(prev => {
         const newSelected = new Set(prev);
@@ -435,7 +432,12 @@ export default function CategoryProductsPage({ params: paramsPromise }: Props) {
       ) : (
         <div className="text-center py-12">
           <p className="text-xl text-muted-foreground">在此系列中未找到任何產品。</p>
-          <p className="mt-2 text-foreground">請先透過「新增產品」功能加入產品到此系列，或檢查您的Firebase設定和資料庫連線。</p>
+          <p className="mt-2 text-foreground">
+            請先透過「新增產品」功能加入產品到此系列，或檢查您的Firebase設定和資料庫連線。
+          </p>
+          <p className="text-sm text-muted-foreground mt-1">
+            提示：如果產品已存在但未顯示，可能是因為它們缺少必要的排序欄位。嘗試使用「管理產品系列」頁面中的「從模擬數據導入產品」功能來修復和填充數據。
+          </p>
         </div>
       )}
       <p className="text-sm text-muted-foreground mt-4 text-center">
