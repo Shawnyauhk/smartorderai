@@ -158,11 +158,17 @@ export default function AdminProductsPage() {
       const orderDocSnap = await getDoc(orderDocRef);
       let storedOrderedNames: string[] = [];
       if (orderDocSnap.exists()) {
-        storedOrderedNames = orderDocSnap.data()?.orderedNames || [];
+        const data = orderDocSnap.data();
+        if (data && Array.isArray(data.orderedNames)) {
+            storedOrderedNames = data.orderedNames;
+        } else {
+            console.warn(`'orderedNames' in ${CATEGORY_ORDER_DOC_ID} is not an array or document is malformed. Using empty order.`);
+            storedOrderedNames = [];
+        }
       }
       
       storedOrderedNames.forEach(name => {
-        if (!categoriesMap[name]) {
+        if (!categoriesMap[name]) { 
           categoriesMap[name] = 0; 
         }
       });
@@ -290,10 +296,13 @@ export default function AdminProductsPage() {
       const orderDocRef = doc(db, CATEGORY_ORDER_COLLECTION, CATEGORY_ORDER_DOC_ID);
       const orderDocSnap = await getDoc(orderDocRef);
       if (orderDocSnap.exists()) {
-        let currentOrderedNames = orderDocSnap.data()?.orderedNames || [];
-        const updatedOrderedNames = currentOrderedNames.filter((name: string) => name !== categoryToDelete.name);
-        if (updatedOrderedNames.length !== currentOrderedNames.length) {
-            await setDoc(orderDocRef, { orderedNames: updatedOrderedNames }, { merge: true });
+        const data = orderDocSnap.data();
+        if (data && Array.isArray(data.orderedNames)) {
+            let currentOrderedNames = data.orderedNames;
+            const updatedOrderedNames = currentOrderedNames.filter((name: string) => name !== categoryToDelete.name);
+            if (updatedOrderedNames.length !== currentOrderedNames.length) {
+                await setDoc(orderDocRef, { orderedNames: updatedOrderedNames }, { merge: true });
+            }
         }
       }
 
@@ -356,7 +365,12 @@ export default function AdminProductsPage() {
       const orderDocSnap = await getDoc(orderDocRef);
       let newOrderedNames = [];
       if (orderDocSnap.exists()) {
-        newOrderedNames = (orderDocSnap.data()?.orderedNames || []).map((name: string) => name === oldCategoryName ? newName : name);
+        const data = orderDocSnap.data();
+        if (data && Array.isArray(data.orderedNames)) {
+            newOrderedNames = data.orderedNames.map((name: string) => name === oldCategoryName ? newName : name);
+        } else {
+            newOrderedNames = [newName]; // Fallback if malformed
+        }
       } else {
         newOrderedNames = [newName];
       }
@@ -403,9 +417,17 @@ export default function AdminProductsPage() {
     try {
       const orderDocRef = doc(db, CATEGORY_ORDER_COLLECTION, CATEGORY_ORDER_DOC_ID);
       const orderDocSnap = await getDoc(orderDocRef);
+      
       let currentOrderedNames: string[] = [];
       if (orderDocSnap.exists()) {
-        currentOrderedNames = orderDocSnap.data()?.orderedNames || [];
+        const data = orderDocSnap.data();
+        // Robust check for Array type
+        if (data && Array.isArray(data.orderedNames)) {
+          currentOrderedNames = data.orderedNames;
+        } else {
+          console.warn(`'orderedNames' in ${CATEGORY_ORDER_DOC_ID} is not an array or document data is null. Initializing as empty array.`);
+          // currentOrderedNames remains [] to prevent errors and allow reset
+        }
       }
 
       if (!currentOrderedNames.includes(trimmedName)) {
@@ -464,7 +486,10 @@ export default function AdminProductsPage() {
       const orderDocSnap = await getDoc(orderDocRef);
       let currentOrderedNames: string[] = [];
       if (orderDocSnap.exists()) {
-        currentOrderedNames = orderDocSnap.data()?.orderedNames || [];
+        const data = orderDocSnap.data();
+        if (data && Array.isArray(data.orderedNames)) {
+            currentOrderedNames = data.orderedNames;
+        }
       }
       
       uniqueCategoriesFromSeed.forEach(seededCategory => {
@@ -535,7 +560,7 @@ export default function AdminProductsPage() {
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
-            <Button 
+             <Button 
                 variant="default"
                 size="lg"
                 onClick={() => setIsNewCategoryDialogOpen(true)} 
