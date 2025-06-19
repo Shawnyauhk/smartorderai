@@ -421,14 +421,18 @@ export default function AdminProductsPage() {
       let currentOrderedNames: string[] = [];
       if (orderDocSnap.exists()) {
         const data = orderDocSnap.data();
-        // Robust check for Array type
-        if (data && Array.isArray(data.orderedNames)) {
+        if (data && Array.isArray(data.orderedNames)) { 
           currentOrderedNames = data.orderedNames;
         } else {
-          console.warn(`'orderedNames' in ${CATEGORY_ORDER_DOC_ID} is not an array or document data is null. Initializing as empty array.`);
-          // currentOrderedNames remains [] to prevent errors and allow reset
+          console.warn(`'orderedNames' in ${CATEGORY_ORDER_DOC_ID} is not an array or document data is null/malformed. Initializing as empty array for new category addition.`);
         }
       }
+      
+      if (!Array.isArray(currentOrderedNames)) {
+           console.warn(`'orderedNames' was not an array, resetting to empty array before adding new category: ${trimmedName}`);
+           currentOrderedNames = [];
+      }
+
 
       if (!currentOrderedNames.includes(trimmedName)) {
         currentOrderedNames.push(trimmedName);
@@ -441,7 +445,7 @@ export default function AdminProductsPage() {
         className: "bg-green-500 text-white border-green-600",
       });
 
-      setNewCategoryDialogOpen(false);
+      setIsNewCategoryDialogOpen(false);
       setNewCategoryNameForCreation('');
       setRefreshKey(prev => prev + 1); 
     } catch (error) {
