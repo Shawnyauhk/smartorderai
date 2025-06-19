@@ -826,3 +826,5 @@ export const mockProducts: Product[] = [
 export const findProductByName = (name: string): Product | undefined => {
   return mockProducts.find(p => p.name.trim() === name.trim());
 };
+
+    
