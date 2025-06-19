@@ -38,7 +38,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
+  AlertDialogTrigger, // Keep this import if other parts of the page use it, but SortableCategoryCard won't.
 } from "@/components/ui/alert-dialog";
 
 type CategoryEntry = { id: string; name: string; count: number };
@@ -77,20 +77,19 @@ function SortableCategoryCard({ categoryItem, children, onDeleteRequest }: Sorta
       >
         <GripVertical className="h-5 w-5" />
       </button>
-      <AlertDialogTrigger asChild>
-        <Button 
-            variant="ghost" 
-            size="icon" 
-            className="absolute top-1 right-1 p-1 text-destructive hover:bg-destructive/10 opacity-0 group-hover/categorycard:opacity-100 transition-opacity"
-            onClick={(e) => {
-              e.stopPropagation(); // Prevent link navigation
-              onDeleteRequest(categoryItem);
-            }}
-            aria-label={`刪除系列 ${categoryItem.name}`}
-            >
-            <Trash2 className="h-5 w-5" />
-        </Button>
-      </AlertDialogTrigger>
+      {/* Removed AlertDialogTrigger from here */}
+      <Button 
+          variant="ghost" 
+          size="icon" 
+          className="absolute top-1 right-1 p-1 text-destructive hover:bg-destructive/10 opacity-0 group-hover/categorycard:opacity-100 transition-opacity"
+          onClick={(e) => {
+            e.stopPropagation(); // Prevent link navigation
+            onDeleteRequest(categoryItem);
+          }}
+          aria-label={`刪除系列 ${categoryItem.name}`}
+          >
+          <Trash2 className="h-5 w-5" />
+      </Button>
     </div>
   );
 }
@@ -129,11 +128,25 @@ export default function AdminProductsPage() {
 
     } catch (error) {
       console.error("Error fetching products from Firestore:", error);
-      toast({
-        title: "讀取產品資料失敗",
-        description: "無法從資料庫讀取產品系列。請檢查您的 Firebase 設定、Firestore 安全性規則或網絡連線。",
-        variant: "destructive",
-      });
+      if ((error as any)?.code === 'failed-precondition' && (error as any)?.message?.includes('requires an index')) {
+         toast({
+          title: "查詢需要索引",
+          description: (
+            <div>
+              <p>Firestore 需要一個複合索引來執行此查詢。錯誤訊息中應包含建立索引的連結。</p>
+              <p className="mt-2 text-xs">錯誤詳情: {(error as Error).message}</p>
+            </div>
+          ),
+          variant: "destructive",
+          duration: 10000,
+        });
+      } else {
+        toast({
+          title: "讀取產品資料失敗",
+          description: "無法從資料庫讀取產品系列。請檢查您的 Firebase 設定、Firestore 安全性規則或網絡連線。",
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsLoading(false);
     }
