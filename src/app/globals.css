@@ -30,8 +30,8 @@ h1, h2, h3, h4, h5, h6 {
     --muted: 39 70% 92%; /* Lighter Tan for muted elements */
     --muted-foreground: 39 50% 45%; /* Muted Brown for text on muted background */
 
-    --accent: 45 100% 67%; /* Mustard Yellow #FFDB58 */
-    --accent-foreground: 40 90% 20%; /* Dark, slightly saturated brown/yellow */
+    --accent: 25 100% 45%; /* Dark Orange */
+    --accent-foreground: 0 0% 100%; /* White for Dark Orange */
     
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
@@ -79,8 +79,8 @@ h1, h2, h3, h4, h5, h6 {
     --muted: 30 20% 20%;
     --muted-foreground: 30 20% 60%;
 
-    --accent: 45 100% 67%; /* Mustard Yellow - kept vibrant */
-    --accent-foreground: 40 90% 15%; 
+    --accent: 25 100% 45%; /* Dark Orange (Consistent with light theme change) */
+    --accent-foreground: 0 0% 100%; /* White for Dark Orange (Consistent with light theme change) */
     
     --destructive: 0 70% 50%;
     --destructive-foreground: 0 0% 98%;
