@@ -47,7 +47,7 @@ const OrderSummaryDisplay: React.FC<OrderSummaryDisplayProps> = ({ items, totalA
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <ScrollArea className="h-[350px] pr-4">
+        <ScrollArea className="max-h-[350px] pr-4">
           {items.map((item, index) => (
             <div key={`${item.productId}-${index}`} className="mb-4 p-4 border border-border rounded-lg bg-card/50 shadow-sm transition-all duration-300 hover:shadow-md">
               <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
