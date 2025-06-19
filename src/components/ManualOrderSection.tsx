@@ -7,8 +7,10 @@ import type { Product } from '@/types';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import ProductCard from '@/components/ProductCard';
-import { ArrowLeftCircle, LayoutGrid, ShoppingBag, List, ArrowUpCircle } from 'lucide-react';
+import { ArrowLeftCircle, LayoutGrid, ShoppingBag, List, ArrowUpCircle, Loader2 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
+import { db } from '@/lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 interface ManualOrderSectionProps {
   allProducts: Product[];
@@ -16,32 +18,91 @@ interface ManualOrderSectionProps {
   scrollableContainerRef?: React.RefObject<HTMLDivElement | null>;
 }
 
-const SCROLL_THRESHOLD = 300; 
+const SCROLL_THRESHOLD = 300;
+const CATEGORY_ORDER_COLLECTION = 'app_configuration';
+const CATEGORY_ORDER_DOC_ID = 'categoryDisplayOrder';
 
 const ManualOrderSection: React.FC<ManualOrderSectionProps> = ({ allProducts, onProductAddToCart, scrollableContainerRef }) => {
   const [selectedCategoryName, setSelectedCategoryName] = useState<string | null>(null);
   const [showBackToTop, setShowBackToTop] = useState(false);
+  const [storedOrderedCategoryNames, setStoredOrderedCategoryNames] = useState<string[]>([]);
+  const [isLoadingCategoryOrder, setIsLoadingCategoryOrder] = useState(true);
+
+  useEffect(() => {
+    const fetchCategoryOrder = async () => {
+      setIsLoadingCategoryOrder(true);
+      try {
+        const orderDocRef = doc(db, CATEGORY_ORDER_COLLECTION, CATEGORY_ORDER_DOC_ID);
+        const orderDocSnap = await getDoc(orderDocRef);
+        if (orderDocSnap.exists()) {
+          const data = orderDocSnap.data();
+          if (data && Array.isArray(data.orderedNames)) {
+            setStoredOrderedCategoryNames(data.orderedNames.filter((name): name is string => typeof name === 'string' && name.trim() !== ''));
+          } else {
+            console.warn(`'orderedNames' in ${CATEGORY_ORDER_DOC_ID} is not an array or document is malformed. Using empty order for manual selection.`);
+            setStoredOrderedCategoryNames([]);
+          }
+        } else {
+          console.warn(`${CATEGORY_ORDER_DOC_ID} document not found. Using empty order for manual selection.`);
+          setStoredOrderedCategoryNames([]);
+        }
+      } catch (error) {
+        console.error("Error fetching category order for manual selection:", error);
+        setStoredOrderedCategoryNames([]); 
+      } finally {
+        setIsLoadingCategoryOrder(false);
+      }
+    };
+    fetchCategoryOrder();
+  }, []);
 
   const categories = useMemo(() => {
     const categoryMap = allProducts.reduce((acc, product) => {
-      if (!acc[product.category]) {
-        acc[product.category] = 0;
+      const categoryName = product.category.trim();
+      if (!categoryName) return acc; // Skip products with empty category names
+      if (!acc[categoryName]) {
+        acc[categoryName] = 0;
       }
-      acc[product.category]++;
+      acc[categoryName]++;
       return acc;
     }, {} as Record<string, number>);
     
-    return Object.entries(categoryMap)
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => a.name.localeCompare(b.name, 'zh-HK')); 
+    let allCategoryEntries = Object.entries(categoryMap)
+      .map(([name, count]) => ({ name, count }));
 
-  }, [allProducts]);
+    allCategoryEntries.sort((a, b) => {
+      const indexA = storedOrderedCategoryNames.indexOf(a.name);
+      const indexB = storedOrderedCategoryNames.indexOf(b.name);
+
+      if (indexA !== -1 && indexB !== -1) { 
+        return indexA - indexB;
+      }
+      if (indexA !== -1) { 
+        return -1;
+      }
+      if (indexB !== -1) { 
+        return 1;
+      }
+      return a.name.localeCompare(b.name, 'zh-HK');
+    });
+    
+    return allCategoryEntries;
+
+  }, [allProducts, storedOrderedCategoryNames]);
 
   const productsInCategory = useMemo(() => {
     if (!selectedCategoryName) return [];
     return allProducts
       .filter(p => p.category === selectedCategoryName)
-      .sort((a,b) => a.name.localeCompare(b.name, 'zh-HK'));
+      .sort((a,b) => {
+        // Primarily sort by 'order' field if it exists, then by name
+        const orderA = typeof a.order === 'number' ? a.order : Infinity;
+        const orderB = typeof b.order === 'number' ? b.order : Infinity;
+        if (orderA !== orderB) {
+          return orderA - orderB;
+        }
+        return a.name.localeCompare(b.name, 'zh-HK');
+      });
   }, [allProducts, selectedCategoryName]);
 
   useEffect(() => {
@@ -84,6 +145,15 @@ const ManualOrderSection: React.FC<ManualOrderSectionProps> = ({ allProducts, on
     setSelectedCategoryName(null);
     scrollableContainerRef?.current?.scrollTo({ top: 0 });
     setShowBackToTop(false);
+  }
+
+  if (isLoadingCategoryOrder) {
+    return (
+      <div className="text-center py-12">
+        <Loader2 className="mx-auto h-10 w-10 text-primary animate-spin mb-3" />
+        <p className="text-lg text-muted-foreground">正在載入產品系列...</p>
+      </div>
+    );
   }
 
   if (selectedCategoryName) {
@@ -171,6 +241,7 @@ const ManualOrderSection: React.FC<ManualOrderSectionProps> = ({ allProducts, on
       ) : (
          <div className="text-center py-12">
             <p className="text-xl text-muted-foreground">沒有可供選擇的產品系列。</p>
+             <p className="mt-2 text-sm text-foreground">請先確保產品庫中已有產品，或嘗試重新整理頁面。</p>
           </div>
       )}
     </div>
@@ -178,3 +249,4 @@ const ManualOrderSection: React.FC<ManualOrderSectionProps> = ({ allProducts, on
 };
 
 export default ManualOrderSection;
+
