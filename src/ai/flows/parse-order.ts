@@ -45,7 +45,8 @@ Strive to understand the customer's intent even if their phrasing isn't precise,
 
 The restaurant offers items in the following general categories (use these as context for understanding items and their full names):
 - 小食 (e.g., 草莓葫蘆, 黑椒腸, 原味腸, 雞蛋仔 might be called '雞記' or '雞旦仔')
-- 仙草/豆花芋圓 (e.g., 仙草大滿貫, 仙草一號 （仙草，地瓜圓，芋圓，蜜紅豆，芋泥）, 仙草二號（仙草，地瓜圓，芋圓，黑糖粉條，珍珠）, 仙草三號（仙草，地瓜圓，芋圓，珍珠，椰果）, 豆花一號, 豆花二號, 豆花大滿貫, 豆花三號, 豆花四號, 豆花五號)
+- 仙草系列 (e.g., 仙草大滿貫, 仙草一號 （仙草，地瓜圓，芋圓，蜜紅豆，芋泥）, 仙草二號（仙草，地瓜圓，芋圓，黑糖粉條，珍珠）, 仙草三號（仙草，地瓜圓，芋圓，珍珠，椰果）, 仙草四號（仙草，地瓜圓，芋圓，小丸子，蜜紅豆）, 仙草五號（仙草，地瓜圓，芋圓，紫米，椰果）)
+- 豆花系列 (e.g., 豆花大滿貫, 豆花一號, 豆花二號, 豆花三號, 豆花四號, 豆花五號)
 - 香蕉餅/蛋餅 (e.g., 開心果香蕉煎餅, 台式蛋餅, 雪糕香蕉煎餅)
 - 格仔餅 (e.g., 雪糕格仔餅, 原味格仔餅, 開心果格仔餅)
 - 飲品 (e.g., 西瓜沙冰, 泰式奶茶, 港式奶茶, 檸檬茶 might be '凍檸茶' or '檸茶', 手打鴨屎香檸檬茶)
@@ -135,3 +136,5 @@ const parseOrderFlow = ai.defineFlow(
   }
 );
 
+
+    
