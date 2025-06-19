@@ -441,16 +441,13 @@ export default function AdminProductsPage() {
       const batch = writeBatch(db);
 
       for (const product of mockProducts) {
-        // Ensure product.id is a string, as Firestore document IDs must be strings.
         const productIdString = String(product.id); 
         const productRef = doc(productsCol, productIdString);
         
-        // Make a copy of the product to avoid modifying the original mockProducts array
-        // and ensure all fields are correctly typed for Firestore.
         const productDataForFirestore: Product = {
           ...product,
-          id: productIdString, // ensure id is string
-          price: Number(product.price) || 0, // ensure price is number
+          id: productIdString, 
+          price: Number(product.price) || 0, 
           name: String(product.name),
           category: String(product.category),
           description: product.description || '',
@@ -462,7 +459,6 @@ export default function AdminProductsPage() {
 
       await batch.commit();
 
-      // Also update category order
       const uniqueCategoriesFromSeed = Array.from(new Set(mockProducts.map(p => p.category.trim()).filter(Boolean)));
       const orderDocRef = doc(db, CATEGORY_ORDER_COLLECTION, CATEGORY_ORDER_DOC_ID);
       const orderDocSnap = await getDoc(orderDocRef);
@@ -539,11 +535,12 @@ export default function AdminProductsPage() {
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
-             <Button 
-                variant="outline" 
+            <Button 
+                variant="default"
+                size="lg"
                 onClick={() => setIsNewCategoryDialogOpen(true)} 
                 disabled={isLoading || isSeeding}
-                className="shadow-md hover:shadow-lg transition-shadow"
+                className="shadow-md hover:shadow-lg transition-shadow transform hover:scale-105"
             >
                 <PlusCircle className="mr-2 h-5 w-5" />
                 新增系列
@@ -712,3 +709,4 @@ export default function AdminProductsPage() {
     </div>
   );
 }
+
