@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { ArrowLeftCircle, ListOrdered, GripVertical, Trash2, Loader2, PlusCircle } from 'lucide-react';
 import type { Product } from '@/types';
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import {
   DndContext,
   closestCenter,
@@ -25,7 +27,7 @@ import {
   rectSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { collection, getDocs, query, where, orderBy, doc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, doc, deleteDoc, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -46,9 +48,11 @@ type Props = {
 interface SortableProductItemProps {
   product: Product;
   onDeleteAttempt: (productId: string, productName: string) => void;
+  isSelected: boolean;
+  onToggleSelection: (productId: string) => void;
 }
 
-function SortableProductItem({ product, onDeleteAttempt }: SortableProductItemProps) {
+function SortableProductItem({ product, onDeleteAttempt, isSelected, onToggleSelection }: SortableProductItemProps) {
   const {
     attributes,
     listeners,
@@ -67,6 +71,14 @@ function SortableProductItem({ product, onDeleteAttempt }: SortableProductItemPr
 
   return (
     <div ref={setNodeRef} style={style} className="relative touch-manipulation group/sortableitem">
+      <Checkbox
+        checked={isSelected}
+        onCheckedChange={() => onToggleSelection(product.id)}
+        aria-label={`選擇 ${product.name}`}
+        className="absolute top-3 left-3 z-20 bg-card/80 rounded-sm border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
+        onClick={(e) => e.stopPropagation()} // Prevent dnd-kit from capturing click
+        onKeyDown={(e) => { if (e.key === ' ') { e.stopPropagation(); } }} // Allow space to toggle
+      />
       <ProductCard product={product} onDeleteAttempt={onDeleteAttempt} showAdminControls={true} />
       <button
         {...attributes}
@@ -90,9 +102,14 @@ export default function CategoryProductsPage({ params: paramsPromise }: Props) {
   const [productToDelete, setProductToDelete] = useState<{id: string; name: string} | null>(null);
   const [isDeletingProduct, setIsDeletingProduct] = useState(false);
 
+  const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
+  const [isBatchDeleteDialogOpen, setIsBatchDeleteDialogOpen] = useState(false);
+  const [isDeletingBatch, setIsDeletingBatch] = useState(false);
+
   const fetchProducts = useCallback(async () => {
     if (!decodedCategory) return;
     setIsLoading(true);
+    setSelectedProductIds(new Set()); // Reset selection on fetch
     try {
       const productsCol = collection(db, 'products');
       const q = query(productsCol, where('category', '==', decodedCategory), orderBy('name'));
@@ -145,7 +162,9 @@ export default function CategoryProductsPage({ params: paramsPromise }: Props) {
       setOrderedProducts((items) => {
         const oldIndex = items.findIndex((item) => item.id === active.id);
         const newIndex = items.findIndex((item) => item.id === over.id);
-        return arrayMove(items, oldIndex, newIndex);
+        const movedItems = arrayMove(items, oldIndex, newIndex);
+        // Potentially save new order to backend here if needed
+        return movedItems;
       });
     }
   }
@@ -160,6 +179,11 @@ export default function CategoryProductsPage({ params: paramsPromise }: Props) {
     try {
       await deleteDoc(doc(db, 'products', productToDelete.id));
       setOrderedProducts(prev => prev.filter(p => p.id !== productToDelete.id));
+      setSelectedProductIds(prev => {
+        const newSelected = new Set(prev);
+        newSelected.delete(productToDelete.id);
+        return newSelected;
+      });
       toast({
         title: "產品刪除成功",
         description: `產品 "${productToDelete.name}" 已成功刪除。`,
@@ -175,6 +199,60 @@ export default function CategoryProductsPage({ params: paramsPromise }: Props) {
     } finally {
       setIsDeletingProduct(false);
       setProductToDelete(null);
+    }
+  };
+
+  const handleToggleProductSelection = (productId: string) => {
+    setSelectedProductIds(prev => {
+      const newSelected = new Set(prev);
+      if (newSelected.has(productId)) {
+        newSelected.delete(productId);
+      } else {
+        newSelected.add(productId);
+      }
+      return newSelected;
+    });
+  };
+
+  const handleToggleSelectAll = (checked: boolean | 'indeterminate') => {
+    if (checked === true || (checked === 'indeterminate' && selectedProductIds.size !== orderedProducts.length)) {
+        setSelectedProductIds(new Set(orderedProducts.map(p => p.id)));
+    } else {
+        setSelectedProductIds(new Set());
+    }
+  };
+  
+  const isAllSelected = orderedProducts.length > 0 && selectedProductIds.size === orderedProducts.length;
+  const isSomeSelected = selectedProductIds.size > 0 && !isAllSelected;
+
+  const confirmBatchDeleteProducts = async () => {
+    if (selectedProductIds.size === 0) return;
+    setIsDeletingBatch(true);
+    const batch = writeBatch(db);
+    const idsToDelete = Array.from(selectedProductIds);
+    idsToDelete.forEach(id => {
+      batch.delete(doc(db, 'products', id));
+    });
+    try {
+      await batch.commit();
+      setOrderedProducts(prev => prev.filter(p => !selectedProductIds.has(p.id)));
+      const deletedCount = selectedProductIds.size;
+      setSelectedProductIds(new Set());
+      toast({
+        title: "批量刪除成功",
+        description: `已成功刪除 ${deletedCount} 個產品。`,
+        className: "bg-green-500 text-white border-green-600",
+      });
+    } catch (error) {
+      console.error("Error batch deleting products:", error);
+      toast({
+        title: "批量刪除失敗",
+        description: "批量刪除產品時發生錯誤。請重試。",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeletingBatch(false);
+      setIsBatchDeleteDialogOpen(false);
     }
   };
   
@@ -193,7 +271,7 @@ export default function CategoryProductsPage({ params: paramsPromise }: Props) {
             {decodedCategory}
           </h1>
           <p className="text-lg text-muted-foreground mt-1">
-            瀏覽 {decodedCategory} 系列中的所有產品。您可以拖動卡片調整產品順序，編輯或刪除產品。
+            瀏覽 {decodedCategory} 系列中的所有產品。您可以拖動卡片調整產品順序，編輯、選擇或刪除產品。
           </p>
         </div>
         <Button size="lg" asChild className="shadow-md hover:shadow-lg transition-shadow transform hover:scale-105 self-start sm:self-auto mt-4 sm:mt-0">
@@ -203,6 +281,33 @@ export default function CategoryProductsPage({ params: paramsPromise }: Props) {
           </Link>
         </Button>
       </div>
+      
+      {orderedProducts.length > 0 && !isLoading && (
+        <div className="flex items-center gap-4 my-4 p-3 bg-card rounded-md shadow">
+            <div className="flex items-center">
+                <Checkbox
+                    id="select-all-products"
+                    aria-label="全選/取消全選當前頁產品"
+                    checked={isAllSelected ? true : (isSomeSelected ? 'indeterminate' : false)}
+                    onCheckedChange={handleToggleSelectAll}
+                    disabled={isLoading || orderedProducts.length === 0}
+                />
+                <Label htmlFor="select-all-products" className="ml-2 text-sm font-medium text-foreground">
+                    {isAllSelected ? "取消全選" : "全選"} ({selectedProductIds.size} / {orderedProducts.length})
+                </Label>
+            </div>
+            <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => { if (selectedProductIds.size > 0) setIsBatchDeleteDialogOpen(true); }}
+                disabled={selectedProductIds.size === 0 || isDeletingBatch || isLoading}
+                className="transition-opacity hover:opacity-90"
+            >
+                {isDeletingBatch ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                批量刪除選中 ({selectedProductIds.size})
+            </Button>
+        </div>
+      )}
       
       <Separator />
 
@@ -215,7 +320,7 @@ export default function CategoryProductsPage({ params: paramsPromise }: Props) {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setProductToDelete(null)}>取消</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => setProductToDelete(null)} disabled={isDeletingProduct}>取消</AlertDialogCancel>
             <AlertDialogAction 
               onClick={confirmDeleteSingleProduct} 
               disabled={isDeletingProduct}
@@ -223,6 +328,28 @@ export default function CategoryProductsPage({ params: paramsPromise }: Props) {
             >
               {isDeletingProduct && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               確認刪除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={isBatchDeleteDialogOpen} onOpenChange={(open) => !open && setIsBatchDeleteDialogOpen(false)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>確認批量刪除產品？</AlertDialogTitle>
+            <AlertDialogDescription>
+              您確定要刪除選中的 {selectedProductIds.size} 個產品嗎？此操作**無法復原**。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setIsBatchDeleteDialogOpen(false)} disabled={isDeletingBatch}>取消</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmBatchDeleteProducts} 
+              disabled={isDeletingBatch || selectedProductIds.size === 0}
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+            >
+              {isDeletingBatch && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              確認刪除 {selectedProductIds.size} 個產品
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -248,7 +375,9 @@ export default function CategoryProductsPage({ params: paramsPromise }: Props) {
                 <SortableProductItem 
                     key={product.id} 
                     product={product} 
-                    onDeleteAttempt={handleAttemptDeleteProduct} 
+                    onDeleteAttempt={handleAttemptDeleteProduct}
+                    isSelected={selectedProductIds.has(product.id)}
+                    onToggleSelection={handleToggleProductSelection}
                 />
               ))}
             </div>
@@ -261,7 +390,7 @@ export default function CategoryProductsPage({ params: paramsPromise }: Props) {
         </div>
       )}
       <p className="text-sm text-muted-foreground mt-4 text-center">
-        提示：目前的排序僅在當前頁面有效，刷新後將重置。如需永久儲存排序，需後續開發。
+        提示：目前的拖曳排序僅在當前頁面有效，刷新後將重置。如需永久儲存排序，需後續開發。
       </p>
     </div>
   );
