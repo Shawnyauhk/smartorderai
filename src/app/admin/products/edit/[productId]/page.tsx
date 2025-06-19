@@ -1,4 +1,3 @@
-
 "use client";
 
 import type React from 'react';
@@ -18,6 +17,9 @@ import Link from 'next/link';
 import Image from 'next/image';
 import type { Product } from '@/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+const CATEGORY_ORDER_COLLECTION = 'app_configuration';
+const CATEGORY_ORDER_DOC_ID = 'categoryDisplayOrder';
 
 export default function EditProductPage() {
   const router = useRouter();
@@ -61,8 +63,8 @@ export default function EditProductPage() {
         setDescription(productData.description || '');
         setDataAiHint(productData['data-ai-hint'] || '');
         setCurrentImageUrl(productData.imageUrl || null);
-        setImagePreview(null); // Reset preview on new product load
-        setImageFile(null); // Reset file on new product load
+        setImagePreview(null); 
+        setImageFile(null); 
         setImageRemoved(false);
       } else {
         toast({
@@ -91,44 +93,105 @@ export default function EditProductPage() {
   }, [productId, fetchProductDetails]);
 
   useEffect(() => {
-    const fetchAllCategories = async () => {
+    const fetchAllUniqueCategories = async () => {
       setIsFetchingCategories(true);
       try {
+        // 1. Fetch categories from existing products
         const productsCol = collection(db, 'products');
         const productsSnapshot = await getDocs(productsCol);
-        const categorySet = new Set<string>();
+        const productBasedCategories = new Set<string>();
         productsSnapshot.forEach(docSnap => {
           const data = docSnap.data();
           if (data.category && typeof data.category === 'string' && data.category.trim() !== '') {
-            categorySet.add(data.category.trim());
+            productBasedCategories.add(data.category.trim());
           }
         });
-        const sortedCategories = Array.from(categorySet).sort((a, b) => a.localeCompare(b, 'zh-HK'));
-        setAvailableCategories(sortedCategories);
+
+        // 2. Fetch ordered category names from app_configuration
+        let storedOrderedCategoryNames: string[] = [];
+        const orderDocRef = doc(db, CATEGORY_ORDER_COLLECTION, CATEGORY_ORDER_DOC_ID);
+        const orderDocSnap = await getDoc(orderDocRef);
+        if (orderDocSnap.exists()) {
+          const data = orderDocSnap.data();
+          if (data && Array.isArray(data.orderedNames)) {
+            storedOrderedCategoryNames = data.orderedNames.filter(name => typeof name === 'string' && name.trim() !== '');
+          }
+        }
+        
+        // 3. Combine and ensure uniqueness
+        const combinedCategoriesSet = new Set<string>([...storedOrderedCategoryNames, ...Array.from(productBasedCategories)]);
+        let allUniqueCategoriesArray = Array.from(combinedCategoriesSet);
+
+        // 4. Sort the categories
+        allUniqueCategoriesArray.sort((a, b) => {
+            const indexA = storedOrderedCategoryNames.indexOf(a);
+            const indexB = storedOrderedCategoryNames.indexOf(b);
+
+            if (indexA !== -1 && indexB !== -1) { // Both in stored order
+                return indexA - indexB;
+            }
+            if (indexA !== -1) { // A is in stored order, B is not
+                return -1;
+            }
+            if (indexB !== -1) { // B is in stored order, A is not
+                return 1;
+            }
+            // Neither in stored order, sort alphabetically
+            return a.localeCompare(b, 'zh-HK');
+        });
+        
+        setAvailableCategories(allUniqueCategoriesArray);
+
       } catch (error) {
-        console.error("Error fetching categories:", error);
+        console.error("Error fetching all unique categories:", error);
         toast({
           title: "讀取產品系列失敗",
           description: "讀取可用產品系列時發生錯誤。",
           variant: "destructive",
         });
-        setAvailableCategories([]);
+        setAvailableCategories([]); // Fallback to empty array on error
       } finally {
         setIsFetchingCategories(false);
       }
     };
-    fetchAllCategories();
+    fetchAllUniqueCategories();
   }, [toast]);
+
 
   useEffect(() => {
     const currentProductCategory = product?.category?.trim();
+    // Start with the globally available categories
+    const newOptionsSet = new Set(availableCategories);
+
+    // Ensure the current product's category is always an option,
+    // even if it's somehow not in the global list (e.g., if it was just changed and not yet reflected elsewhere)
     if (currentProductCategory) {
-      const newOptionsSet = new Set(availableCategories);
-      newOptionsSet.add(currentProductCategory); // Ensure current product's category is always an option
-      setCategoryOptions(Array.from(newOptionsSet).sort((a, b) => a.localeCompare(b, 'zh-HK')));
-    } else {
-      setCategoryOptions(availableCategories); // If no product or product.category, use fetched categories directly
+      newOptionsSet.add(currentProductCategory);
     }
+    
+    let finalOptionsArray = Array.from(newOptionsSet);
+
+    // Re-sort based on the logic that availableCategories should already be sorted by stored order then alphabetically
+    // This ensures that if currentProductCategory was added, it gets sorted correctly.
+    finalOptionsArray.sort((a, b) => {
+        const indexA = availableCategories.indexOf(a); // Use the sort order from availableCategories
+        const indexB = availableCategories.indexOf(b);
+
+        if (indexA !== -1 && indexB !== -1) {
+            return indexA - indexB;
+        }
+        if (indexA !== -1) {
+            return -1;
+        }
+        if (indexB !== -1) {
+            return 1;
+        }
+        // Fallback for categories not in availableCategories (should be rare, mainly for the current product's category if it was new)
+        return a.localeCompare(b, 'zh-HK');
+    });
+    
+    setCategoryOptions(finalOptionsArray);
+
   }, [product, availableCategories]);
 
 
@@ -233,7 +296,7 @@ export default function EditProductPage() {
     }
   };
   
-  const categoryData = category; // Use the state variable for category
+  const categoryData = category; 
 
   if (isFetchingProduct) {
     return (
@@ -244,7 +307,7 @@ export default function EditProductPage() {
     );
   }
 
-  if (!product && !isFetchingProduct) { // Ensure product is null AND not fetching anymore
+  if (!product && !isFetchingProduct) { 
     return (
       <div className="text-center py-12">
         <p className="text-xl text-destructive">找不到產品資料。</p>
@@ -412,3 +475,4 @@ export default function EditProductPage() {
     </div>
   );
 }
+
