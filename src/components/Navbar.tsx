@@ -2,18 +2,18 @@
 "use client";
 
 import Link from 'next/link';
-import { ShoppingBasket, Settings } from 'lucide-react'; // Removed unused Home icon
+import { ShoppingBasket, Settings } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from './ui/button';
-import { useState, useEffect } from 'react'; // Import useState and useEffect
+import { useState, useEffect } from 'react';
 
 const Navbar = () => {
   const pathname = usePathname();
-  const [isMounted, setIsMounted] = useState(false); // Add mounted state
+  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
-    setIsMounted(true); // Set to true once component mounts on client
+    setIsMounted(true);
   }, []);
 
   const navItems = [
