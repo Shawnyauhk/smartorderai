@@ -25,7 +25,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { collection, getDocs, query, writeBatch, doc, where, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, query, writeBatch, doc, where, deleteDoc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { mockProducts } from '@/lib/product-data';
@@ -42,6 +42,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+
+const CATEGORY_ORDER_COLLECTION = 'app_configuration';
+const CATEGORY_ORDER_DOC_ID = 'categoryDisplayOrder';
 
 type CategoryEntry = { id: string; name: string; count: number };
 
@@ -72,7 +75,6 @@ function SortableCategoryCard({ categoryItem, children, onDeleteRequest, onEditR
   return (
     <div ref={setNodeRef} style={style} className="relative touch-manipulation group/categorycard">
       {children}
-      {/* Admin Controls Toolbar */}
       <div className="absolute top-2 right-2 flex flex-col gap-1.5 opacity-0 group-hover/categorycard:opacity-100 transition-opacity z-10">
         <button
           {...attributes}
@@ -130,13 +132,13 @@ export default function AdminProductsPage() {
     setIsLoading(true);
     try {
       const productsCol = collection(db, 'products');
-      const productsSnapshot = await getDocs(query(productsCol)); // Consider adding orderBy here if needed, or rely on client-side sort
+      const productsSnapshot = await getDocs(query(productsCol));
       const fetchedProducts: Product[] = productsSnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Product));
 
       const categoriesMap = fetchedProducts.reduce((acc, product) => {
-        if (!product.category) return acc; // Skip products without a category
+        if (!product.category) return acc;
         const categoryName = product.category.trim();
-        if (!categoryName) return acc; // Skip products with empty string category
+        if (!categoryName) return acc;
 
         if (!acc[categoryName]) {
           acc[categoryName] = 0;
@@ -145,11 +147,37 @@ export default function AdminProductsPage() {
         return acc;
       }, {} as Record<string, number>);
 
-      const initialCategories = Object.entries(categoriesMap)
-        .map(([name, count]) => ({ id: name, name, count })) // id is name for DNDKit key
-        .sort((a, b) => a.name.localeCompare(b.name, 'zh-HK'));
+      let initialCategories = Object.entries(categoriesMap)
+        .map(([name, count]) => ({ id: name, name, count }));
 
-      setOrderedCategories(initialCategories);
+      const orderDocRef = doc(db, CATEGORY_ORDER_COLLECTION, CATEGORY_ORDER_DOC_ID);
+      const orderDocSnap = await getDoc(orderDocRef);
+      let storedOrderedNames: string[] = [];
+      if (orderDocSnap.exists()) {
+        storedOrderedNames = orderDocSnap.data()?.orderedNames || [];
+      }
+      
+      initialCategories.sort((a, b) => {
+        const indexA = storedOrderedNames.indexOf(a.name);
+        const indexB = storedOrderedNames.indexOf(b.name);
+
+        if (indexA !== -1 && indexB !== -1) {
+          return indexA - indexB; 
+        }
+        if (indexA !== -1) {
+          return -1; 
+        }
+        if (indexB !== -1) {
+          return 1; 
+        }
+        return a.name.localeCompare(b.name, 'zh-HK');
+      });
+      
+      const validStoredOrderCategories = storedOrderedNames.map(name => initialCategories.find(cat => cat.name === name)).filter(Boolean) as CategoryEntry[];
+      const newCategories = initialCategories.filter(cat => !storedOrderedNames.includes(cat.name));
+      newCategories.sort((a,b) => a.name.localeCompare(b.name, 'zh-HK'));
+
+      setOrderedCategories([...validStoredOrderCategories, ...newCategories]);
 
     } catch (error) {
       console.error("Error fetching products from Firestore:", error);
@@ -190,14 +218,38 @@ export default function AdminProductsPage() {
     })
   );
 
-  function handleDragEnd(event: DragEndEvent) {
+  async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     if (over && active.id !== over.id) {
+      let newOrderedItems: CategoryEntry[] = [];
       setOrderedCategories((items) => {
         const oldIndex = items.findIndex((item) => item.id === active.id);
         const newIndex = items.findIndex((item) => item.id === over.id);
-        return arrayMove(items, oldIndex, newIndex);
+        newOrderedItems = arrayMove(items, oldIndex, newIndex);
+        return newOrderedItems;
       });
+
+      if (newOrderedItems.length > 0) {
+        try {
+          const newOrderNames = newOrderedItems.map(item => item.name);
+          const orderDocRef = doc(db, CATEGORY_ORDER_COLLECTION, CATEGORY_ORDER_DOC_ID);
+          await setDoc(orderDocRef, { orderedNames: newOrderNames }, { merge: true });
+          toast({
+            title: "系列順序已儲存",
+            description: "新的系列排列順序已成功儲存到資料庫。",
+            className: "bg-green-500 text-white border-green-600",
+          });
+        } catch (error) {
+          console.error("Error saving category order:", error);
+          toast({
+            title: "儲存順序失敗",
+            description: "儲存系列排列順序時發生錯誤。",
+            variant: "destructive",
+          });
+          // Optionally revert optimistic update if saving fails, or reload data
+          // For now, we keep the optimistic update and log error.
+        }
+      }
     }
   }
 
@@ -223,6 +275,18 @@ export default function AdminProductsPage() {
       }
       
       setOrderedCategories(prev => prev.filter(c => c.id !== categoryToDelete.id));
+      
+      // Update stored order
+      const orderDocRef = doc(db, CATEGORY_ORDER_COLLECTION, CATEGORY_ORDER_DOC_ID);
+      const orderDocSnap = await getDoc(orderDocRef);
+      if (orderDocSnap.exists()) {
+        let currentOrderedNames = orderDocSnap.data()?.orderedNames || [];
+        const updatedOrderedNames = currentOrderedNames.filter((name: string) => name !== categoryToDelete.name);
+        if (updatedOrderedNames.length !== currentOrderedNames.length) {
+            await setDoc(orderDocRef, { orderedNames: updatedOrderedNames }, { merge: true });
+        }
+      }
+
       toast({
         title: "系列刪除成功",
         description: `系列 "${categoryToDelete.name}" 及其所有產品已成功刪除。`,
@@ -243,7 +307,7 @@ export default function AdminProductsPage() {
 
   const handleRequestEditCategory = (category: CategoryEntry) => {
     setCategoryToEdit(category);
-    setNewCategoryNameInput(category.name); // Pre-fill input with current name
+    setNewCategoryNameInput(category.name);
   };
 
   const handleConfirmEditCategory = async () => {
@@ -254,10 +318,9 @@ export default function AdminProductsPage() {
     const newName = newCategoryNameInput.trim();
     if (newName === categoryToEdit.name) {
       toast({ title: "提示", description: "新舊系列名稱相同，無需修改。", variant: "default" });
-      setCategoryToEdit(null); // Close dialog
+      setCategoryToEdit(null);
       return;
     }
-     // Check for name collision with other existing categories
     if (orderedCategories.some(cat => cat.name === newName && cat.id !== categoryToEdit.id)) {
       toast({ title: "錯誤", description: `系列名稱 "${newName}" 已存在。請使用不同的名稱。`, variant: "destructive" });
       return;
@@ -279,18 +342,63 @@ export default function AdminProductsPage() {
         });
         await batch.commit();
       }
+      
+      const orderDocRef = doc(db, CATEGORY_ORDER_COLLECTION, CATEGORY_ORDER_DOC_ID);
+      const orderDocSnap = await getDoc(orderDocRef);
+      if (orderDocSnap.exists()) {
+        let currentOrderedNames = orderDocSnap.data()?.orderedNames || [];
+        const oldNameIndex = currentOrderedNames.indexOf(oldCategoryName);
+        if (oldNameIndex !== -1) {
+          currentOrderedNames[oldNameIndex] = newName;
+          await setDoc(orderDocRef, { orderedNames: currentOrderedNames }, { merge: true });
+        } else { 
+          // If old name wasn't in order, add new one (should ideally not happen if all categories are in order)
+          // This case might occur if a category was added and order not saved yet.
+          // For safety, we re-fetch all categories and sort based on updated order.
+          // Or simply rely on loadData() to re-sort correctly. For now, we just update.
+           currentOrderedNames.push(newName); // Add if it wasn't there
+           await setDoc(orderDocRef, { orderedNames: currentOrderedNames }, { merge: true });
+        }
+      } else {
+         // If order doc doesn't exist, create it with the new name (and potentially others later)
+         await setDoc(orderDocRef, { orderedNames: [newName] }, { merge: true });
+      }
 
-      setOrderedCategories(prev =>
-        prev.map(cat =>
-          cat.id === oldCategoryId ? { ...cat, name: newName, id: newName } : cat // Update name and id
-        ).sort((a, b) => a.name.localeCompare(b.name, 'zh-HK')) // Re-sort
-      );
+      // Update local state and re-sort based on the new persisted order (or what loadData would do)
+      setOrderedCategories(prev => {
+        const updatedCategories = prev.map(cat =>
+          cat.id === oldCategoryId ? { ...cat, name: newName, id: newName } : cat 
+        );
+        // Re-fetch and re-apply full sort from `loadData` logic to ensure consistency with potentially new `storedOrderedNames`
+        // For simplicity here, we just update the name and id locally, and rely on next full load or drag for perfect re-order from DB.
+        // A more robust way would be to call loadData or replicate its sorting logic here.
+        // For now:
+        let tempStoredOrder = orderDocSnap.exists() ? (orderDocSnap.data()?.orderedNames.map((n: string) => n === oldCategoryName ? newName : n) || []) : [newName];
+        
+        updatedCategories.sort((a, b) => {
+            const indexA = tempStoredOrder.indexOf(a.name);
+            const indexB = tempStoredOrder.indexOf(b.name);
+            if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+            if (indexA !== -1) return -1;
+            if (indexB !== -1) return 1;
+            return a.name.localeCompare(b.name, 'zh-HK');
+        });
+        return updatedCategories;
+      });
+
 
       toast({
         title: "系列名稱更新成功",
         description: `系列 "${oldCategoryName}" 已成功更名為 "${newName}"。`,
         className: "bg-green-500 text-white border-green-600",
       });
+      
+      // Trigger a full reload of data to ensure order is perfectly synced
+      // This might be slightly overkill but ensures consistency if multiple edits happen fast
+      // setRefreshKey(prev => prev + 1); 
+      // Commented out direct refresh, as local update + sort should be mostly fine, 
+      // and full refresh can be jarring. Next full page load will sync.
+
     } catch (error) {
       console.error(`Error updating category name for ${oldCategoryName}:`, error);
       toast({
@@ -344,7 +452,7 @@ export default function AdminProductsPage() {
         variant: "default",
         className: "bg-green-500 text-white border-green-600",
       });
-      setRefreshKey(prevKey => prevKey + 1);
+      setRefreshKey(prevKey => prevKey + 1); // Trigger data reload to reflect new products and categories
     } catch (error) {
       console.error("Error seeding database:", error);
       toast({
@@ -366,7 +474,7 @@ export default function AdminProductsPage() {
             產品系列
           </h1>
           <p className="text-lg text-muted-foreground mt-1">
-            選擇一個系列以查看詳細產品。您可以拖動卡片調整系列順序，或編輯/刪除系列。
+            選擇一個系列以查看詳細產品。您可以拖動卡片調整系列順序，或編輯/刪除系列。調整後的順序將會儲存。
           </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 items-stretch">
@@ -410,7 +518,6 @@ export default function AdminProductsPage() {
 
       <Separator />
 
-      {/* Delete Category Dialog */}
       <AlertDialog open={!!categoryToDelete} onOpenChange={(open) => !open && setCategoryToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -434,13 +541,12 @@ export default function AdminProductsPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Edit Category Name Dialog */}
       <AlertDialog open={!!categoryToEdit} onOpenChange={(open) => { if (!open) { setCategoryToEdit(null); setNewCategoryNameInput(''); }}}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>編輯系列名稱</AlertDialogTitle>
             <AlertDialogDescription>
-              為系列「{categoryToEdit?.name}」輸入新的名稱。此操作將更新此系列下所有產品的分類。
+              為系列「{categoryToEdit?.name}」輸入新的名稱。此操作將更新此系列下所有產品的分類，並儲存系列順序。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="py-2 space-y-2">
@@ -481,7 +587,7 @@ export default function AdminProductsPage() {
           onDragEnd={handleDragEnd}
         >
           <SortableContext
-            items={orderedCategories.map(c => c.id)} // Ensure ID is stable and unique
+            items={orderedCategories.map(c => c.id)} 
             strategy={verticalListSortingStrategy}
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -497,7 +603,6 @@ export default function AdminProductsPage() {
                       href={`/admin/products/${encodeURIComponent(categoryItem.name)}`}
                       className="block hover:no-underline flex-grow p-1"
                       onClick={(e) => {
-                        // Prevent navigation if any of the buttons in the toolbar are active
                         if ((e.target as HTMLElement).closest('button[aria-label*="系列"]') || (e.target as HTMLElement).closest('button[aria-label*="排序"]')) {
                            e.preventDefault();
                         }
@@ -526,10 +631,6 @@ export default function AdminProductsPage() {
           </p>
         </div>
       )}
-       <p className="text-sm text-muted-foreground mt-4 text-center">
-        提示：目前的排序僅在當前頁面有效，刷新後將重置。如需永久儲存排序，需後續開發。
-      </p>
     </div>
   );
 }
-
