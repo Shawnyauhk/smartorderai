@@ -69,7 +69,7 @@ When parsing the order:
     *   Determine the specific food or drink items requested. Use common, recognizable names for items, exactly as they would appear on a detailed menu. For example, if the menu has "仙草二號（仙草，地瓜圓，芋圓，黑糖粉條，珍珠）", use this full name.
     *   Handle abbreviations, common nicknames (e.g., "雞記" for "雞蛋仔", "檸茶" for "檸檬茶"), and slight misspellings, considering the identified input language if provided.
     *   **IMPORTANT FOR "大滿貫" VARIANTS**: If a user says a term like "豆花滿貫" (missing '大') and the menu explicitly contains "豆花大滿貫", you **MUST** interpret this as a request for "豆花大滿貫" and set \`isAmbiguous\` to \`false\` (or omit it). The same applies if the user says "仙草滿貫" and "仙草大滿貫" is on the menu; interpret it as "仙草大滿貫" without ambiguity. Apply similar logic to other close matches where user input strongly implies a specific full menu item.
-    *   If a user specifies a partial name with a number (e.g., '仙草2', '豆花1', or '仙草二號'), and a *unique* product in the menu context matches this (e.g., '仙草二號（仙草，地瓜圓，芋圓，黑糖粉條，珍珠）'), you **MUST** identify that specific product (quantity 1 unless specified otherwise, like "仙草二號三碗"). In this case, \`isAmbiguous\` should be \`false\` or omitted.
+    *   If a user specifies a partial name with a number (e.g., '仙草2', '豆花1', '仙草二號', or even a slight variation like '先做3號' which should be interpreted as likely '仙草三號' if '仙草三號(...full name...)' exists), and a *unique* product in the menu context matches this (e.g., '仙草二號（仙草，地瓜圓，芋圓，黑糖粉條，珍珠）' for '仙草2', or '仙草三號（仙草，地瓜圓，芋圓，珍珠，椰果）' for '先做3號'), you **MUST** identify that specific product. **Crucially, if a quantity is specified with this item (e.g., '兩個仙草三號', '仙草三號兩個', or '我要兩個先做3號'), you MUST apply that specified quantity (e.g., 2 in these examples) to the identified product.** If no quantity is specified with the item, then assume quantity 1. For such direct matches or clear intentions where a unique product is identified, \`isAmbiguous\` should be \`false\` or omitted.
     *   If the user input is primarily a number that could refer to a numbered series of items (e.g., "三號", "2號", "五號"), and multiple distinct products in the menu context incorporate this number (e.g., menu has '仙草三號（仙草，地瓜圓，芋圓，珍珠，椰果）' and '豆花三號'), you **MUST** identify ALL such distinct products. Each identified product should be a separate entry in the \`orderItems\` array with its full name. For example, if the user says "三號", and both "仙草三號（仙草，地瓜圓，芋圓，珍珠，椰果）" and "豆花三號" are on the menu, your output should include two separate items: one for "仙草三號（仙草，地瓜圓，芋圓，珍珠，椰果）" (quantity 1) and one for "豆花三號" (quantity 1), unless quantities are otherwise specified. These items should NOT be marked as ambiguous; instead, list them as individual concrete items. In this specific case, where a number input is expanded into multiple concrete product items, you should NOT create an additional ambiguous item for the original number term itself (e.g., for "三號"). The output should only contain the identified concrete product items.
 
 2.  **Determine Quantities**:
@@ -122,7 +122,7 @@ User says: "一份原味格仔餅，加底，同一杯熱奶茶，唔要糖。"
 - item: "港式奶茶", quantity: 1, specialRequests: "熱, 不要糖" (Assuming 港式奶茶 is the default if not specified, adjust if needed)
 
 User says: "我要三碗豆花二號，唔該。"
-- item: "豆花二號（豆花，地瓜圓，芋圓，黑糖粉條，珍珠）", quantity: 3  (Example assumes 豆花二號 has full name in data)
+- item: "豆花二號（豆花，地瓜圓，芋圓，黑糖粉條，珍珠）", quantity: 3
 
 User says: "仙草2" (Assuming "仙草二號（仙草，地瓜圓，芋圓，黑糖粉條，珍珠）" is a product and no other product is "X仙草2" or "仙草2Y")
 - item: "仙草二號（仙草，地瓜圓，芋圓，黑糖粉條，珍珠）", quantity: 1
@@ -130,6 +130,7 @@ User says: "仙草2" (Assuming "仙草二號（仙草，地瓜圓，芋圓，黑
 Remember, for \`specialRequests\`, if there are none, the field **MUST BE OMITTED** (Rule 0).
 For AMBIGUOUS items like "大滿貫" when multiple products match, you **MUST** follow the exact JSON structure provided in Rule 4, including the **ULTRA-IMPORTANT CLARIFICATION**.
 For near-matches like "豆花滿貫", you should directly map to "豆花大滿貫" if it exists and is unambiguous.
+And critically, for inputs like "我要兩個先做3號", if "先做3號" resolves to "仙草三號(...full name...)", the quantity MUST be 2.
 `,
 });
 
@@ -147,3 +148,4 @@ const parseOrderFlow = ai.defineFlow(
 );
     
 
+    
