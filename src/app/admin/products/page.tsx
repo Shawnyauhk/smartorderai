@@ -167,20 +167,14 @@ export default function AdminProductsPage() {
         }
       }
       
-      // Add categories from storedOrderedNames that might be empty (count 0)
       storedOrderedNames.forEach(name => {
         if (!categoriesMap[name]) { 
           categoriesMap[name] = 0; 
         }
       });
 
-      // Rebuild initialCategories to include potentially empty ones from storedOrder
        initialCategories = Object.entries(categoriesMap)
         .map(([name, count]) => ({ id: name, name, count }))
-        // Filter out categories that are in storedOrderedNames but have 0 products and are not in uniqueCategoriesFromMock (unless we specifically want to keep all from storedOrderedNames)
-        // The goal is to ensure only valid/active categories appear. If a category is in storedOrderedNames but has no products, it should still appear if it's a legit empty category.
-        // If it's a stale name (e.g., "豆花芋圓" which is not in mockProducts), it should ideally be removed from storedOrderedNames by the seeding process.
-        // For now, if it's in storedOrderedNames, we show it. The seeding function is responsible for cleaning storedOrderedNames.
         ;
 
 
@@ -197,12 +191,9 @@ export default function AdminProductsPage() {
         if (indexB !== -1) {
           return 1; 
         }
-        // Fallback sort for categories not in storedOrderedNames (e.g., new ones from products)
         return a.name.localeCompare(b.name, 'zh-HK');
       });
       
-      // Final list construction: ensure categories from storedOrderedNames are prioritized and correctly ordered,
-      // then append any other categories found in products but not in storedOrderedNames.
       const finalOrderedCategories = [];
       const categoriesInProductsSet = new Set(initialCategories.map(c => c.name));
 
@@ -211,13 +202,11 @@ export default function AdminProductsPage() {
         if (category) {
           finalOrderedCategories.push(category);
         }
-        // If a name is in storedOrderedNames but not in initialCategories (meaning no products for it),
-        // it's already handled by the `categoriesMap[name] = 0` logic above.
       }
 
       const remainingCategories = initialCategories
         .filter(c => !storedOrderedNames.includes(c.name))
-        .sort((a,b) => a.name.localeCompare(b.name, 'zh-HK')); // Sort remaining alphabetically
+        .sort((a,b) => a.name.localeCompare(b.name, 'zh-HK')); 
       
       finalOrderedCategories.push(...remainingCategories);
       
@@ -492,7 +481,7 @@ export default function AdminProductsPage() {
       const productsCol = collection(db, 'products');
       const batch = writeBatch(db);
 
-      for (const product of mockProducts) {
+      mockProducts.forEach((product, index) => { // Added index here
         const productIdString = String(product.id); 
         const productRef = doc(productsCol, productIdString);
         
@@ -505,13 +494,13 @@ export default function AdminProductsPage() {
           description: product.description || '',
           imageUrl: product.imageUrl || `https://placehold.co/300x200.png`,
           'data-ai-hint': product['data-ai-hint'] || product.name.toLowerCase().split(' ').slice(0,2).join(' ') || 'food item',
+          order: index, // Assign index from mockProducts as the initial order
         };
         batch.set(productRef, productDataForFirestore);
-      }
+      });
 
       await batch.commit();
 
-      // Update categoryDisplayOrder based on the categories present in mockProducts
       const uniqueCategoriesFromSeed = Array.from(new Set(mockProducts.map(p => p.category.trim()).filter(Boolean)));
       
       const orderDocRef = doc(db, CATEGORY_ORDER_COLLECTION, CATEGORY_ORDER_DOC_ID);
@@ -525,18 +514,15 @@ export default function AdminProductsPage() {
         }
       }
       
-      // Filter existingOrderedNames to only include categories that are ACTUALLY in the new seed data
       let updatedOrderedNames = existingOrderedNames.filter(name => uniqueCategoriesFromSeed.includes(name));
       
-      // Add any new categories from seed data that weren't in the old order, and sort them alphabetically
       const newlyAddedCategoriesFromSeed = uniqueCategoriesFromSeed.filter(name => !updatedOrderedNames.includes(name));
-      newlyAddedCategoriesFromSeed.sort((a,b) => a.localeCompare(b, 'zh-HK')); 
+      newlyAddedCategoriesFromSeed.sort((a,b) => a.name.localeCompare(b.name, 'zh-HK')); 
       
       updatedOrderedNames.push(...newlyAddedCategoriesFromSeed);
       
-      // If after filtering, updatedOrderedNames is empty but seed has categories, populate with sorted seed categories
       if (updatedOrderedNames.length === 0 && uniqueCategoriesFromSeed.length > 0) {
-          uniqueCategoriesFromSeed.sort((a,b) => a.localeCompare(b, 'zh-HK'));
+          uniqueCategoriesFromSeed.sort((a,b) => a.name.localeCompare(b.name, 'zh-HK'));
           updatedOrderedNames = [...uniqueCategoriesFromSeed];
       }
       
@@ -544,7 +530,7 @@ export default function AdminProductsPage() {
 
       toast({
         title: "模擬數據導入成功！",
-        description: `${mockProducts.length} 項模擬產品已成功導入到資料庫，並且產品系列順序已根據模擬數據更新。陳舊或無效的系列名稱已從排序中移除。`,
+        description: `${mockProducts.length} 項模擬產品已成功導入到資料庫（包含初始排序值），並且產品系列順序已根據模擬數據更新。`,
         className: "bg-green-500 text-white border-green-600",
         duration: 8000,
       });
@@ -592,10 +578,10 @@ export default function AdminProductsPage() {
                 <AlertDialogHeader>
                   <AlertDialogTitle>確認導入模擬數據？</AlertDialogTitle>
                   <AlertDialogDescription>
-                    此操作將會把系統內建的模擬產品數據 (共 {mockProducts.length} 項) 導入到您的 Firebase Firestore 產品庫中。
+                    此操作將會把系統內建的模擬產品數據 (共 {mockProducts.length} 項) 導入到您的 Firebase Firestore 產品庫中，並為每個產品設定初始排序值。
                     如果您的產品庫中已有同名產品，此操作可能會造成數據重複。
-                    同時，產品系列的顯示順序將會**根據模擬數據進行更新**，移除不存在於模擬數據中的舊系列名稱（例如 "豆花芋圓"）。
-                    建議在產品庫為空或僅作初步填充時使用，或在需要用模擬數據重置分類時使用。
+                    同時，產品系列的顯示順序將會**根據模擬數據進行更新**，移除不存在於模擬數據中的舊系列名稱。
+                    建議在產品庫為空或僅作初步填充時使用，或在需要用模擬數據重置分類及產品排序時使用。
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -781,4 +767,5 @@ export default function AdminProductsPage() {
 
     
 
+    
     

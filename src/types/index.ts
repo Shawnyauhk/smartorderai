@@ -8,7 +8,7 @@ export interface Product {
   imageUrl?: string;
   // For AI hint for image search for placeholders
   "data-ai-hint"?: string; 
-  order?: number; // Added for sortable products within a category
+  order: number; // Changed from order?: number to ensure it's always present
   options?: {
     name: string;
     choices: { name: string; priceAdjustment?: number }[];
