@@ -363,18 +363,18 @@ export default function AdminProductsPage() {
       
       const orderDocRef = doc(db, CATEGORY_ORDER_COLLECTION, CATEGORY_ORDER_DOC_ID);
       const orderDocSnap = await getDoc(orderDocRef);
-      let newOrderedNames = [];
+      let newOrderedNamesList = [];
       if (orderDocSnap.exists()) {
         const data = orderDocSnap.data();
         if (data && Array.isArray(data.orderedNames)) {
-            newOrderedNames = data.orderedNames.map((name: string) => name === oldCategoryName ? newName : name);
+            newOrderedNamesList = data.orderedNames.map((name: string) => name === oldCategoryName ? newName : name);
         } else {
-            newOrderedNames = [newName]; // Fallback if malformed
+            newOrderedNamesList = [newName]; 
         }
       } else {
-        newOrderedNames = [newName];
+        newOrderedNamesList = [newName];
       }
-      await setDoc(orderDocRef, { orderedNames: newOrderedNames }, { merge: true });
+      await setDoc(orderDocRef, { orderedNames: newOrderedNamesList }, { merge: true });
       
       toast({
         title: "系列名稱更新成功",
@@ -425,6 +425,7 @@ export default function AdminProductsPage() {
           currentOrderedNames = data.orderedNames;
         } else {
           console.warn(`'orderedNames' in ${CATEGORY_ORDER_DOC_ID} is not an array or document data is null/malformed. Initializing as empty array for new category addition.`);
+          currentOrderedNames = [];
         }
       }
       
@@ -486,27 +487,35 @@ export default function AdminProductsPage() {
       await batch.commit();
 
       const uniqueCategoriesFromSeed = Array.from(new Set(mockProducts.map(p => p.category.trim()).filter(Boolean)));
+      
       const orderDocRef = doc(db, CATEGORY_ORDER_COLLECTION, CATEGORY_ORDER_DOC_ID);
       const orderDocSnap = await getDoc(orderDocRef);
-      let currentOrderedNames: string[] = [];
+      let existingOrderedNames: string[] = [];
       if (orderDocSnap.exists()) {
         const data = orderDocSnap.data();
         if (data && Array.isArray(data.orderedNames)) {
-            currentOrderedNames = data.orderedNames;
+            existingOrderedNames = data.orderedNames;
         }
       }
       
-      uniqueCategoriesFromSeed.forEach(seededCategory => {
-        if (!currentOrderedNames.includes(seededCategory)) {
-          currentOrderedNames.push(seededCategory);
-        }
-      });
-      await setDoc(orderDocRef, { orderedNames: currentOrderedNames }, { merge: true });
+      const updatedOrderedNames = existingOrderedNames.filter(name => uniqueCategoriesFromSeed.includes(name));
+      
+      const newlyAddedCategories = uniqueCategoriesFromSeed.filter(name => !updatedOrderedNames.includes(name));
+      newlyAddedCategories.sort((a,b) => a.localeCompare(b, 'zh-HK')); 
+      
+      updatedOrderedNames.push(...newlyAddedCategories);
+      
+      if (updatedOrderedNames.length === 0 && uniqueCategoriesFromSeed.length > 0) {
+          uniqueCategoriesFromSeed.sort((a,b) => a.localeCompare(b, 'zh-HK'));
+          updatedOrderedNames.push(...uniqueCategoriesFromSeed);
+      }
+      
+      await setDoc(orderDocRef, { orderedNames: updatedOrderedNames });
 
 
       toast({
         title: "模擬數據導入成功！",
-        description: `${mockProducts.length} 項模擬產品已成功導入到資料庫。`,
+        description: `${mockProducts.length} 項模擬產品已成功導入到資料庫，並且產品系列順序已更新。`,
         className: "bg-green-500 text-white border-green-600",
       });
       setRefreshKey(prev => prev + 1); 
@@ -555,6 +564,7 @@ export default function AdminProductsPage() {
                   <AlertDialogDescription>
                     此操作將會把系統內建的模擬產品數據 (共 {mockProducts.length} 項) 導入到您的 Firebase Firestore 產品庫中。
                     如果您的產品庫中已有同名產品，此操作可能會造成數據重複。
+                    同時，產品系列的顯示順序將會根據模擬數據進行更新，移除不存在於模擬數據中的舊系列名稱。
                     建議在產品庫為空或僅作初步填充時使用。
                   </AlertDialogDescription>
                 </AlertDialogHeader>
@@ -739,3 +749,4 @@ export default function AdminProductsPage() {
   );
 }
 
+    
