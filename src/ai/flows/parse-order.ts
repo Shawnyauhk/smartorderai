@@ -52,7 +52,7 @@ If the language is 'mixed' or 'unknown', be flexible in your interpretation.
 The restaurant offers items in the following general categories (use these as context for understanding items and their full names):
 - 小食 (e.g., 草莓葫蘆, 黑椒腸, 原味腸, 雞蛋仔 might be called '雞記' or '雞旦仔' in Cantonese)
 - 仙草系列 (e.g., 仙草大滿貫, 仙草一號 （仙草，地瓜圓，芋圓，蜜紅豆，芋泥）, 仙草二號（仙草，地瓜圓，芋圓，黑糖粉條，珍珠）, 仙草三號（仙草，地瓜圓，芋圓，珍珠，椰果）, 仙草四號（仙草，地瓜圓，芋圓，小丸子，蜜紅豆）, 仙草五號（仙草，地瓜圓，芋圓，紫米，椰果）)
-- 豆花系列 (e.g., 豆花大滿貫, 豆花一號, 豆花二號, 豆花三號, 豆花四號, 豆花五號)
+- 豆花系列 (e.g., 豆花大滿貫, 豆花一號 （豆花，地瓜圓，芋圓，蜜紅豆，芋泥）, 豆花二號（豆花，地瓜圓，芋圓，黑糖粉條，珍珠）, 豆花三號（豆花，地瓜圓，芋圓，珍珠，椰果）, 豆花四號（豆花，地瓜圓，芋圓，小丸子，蜜紅豆）, 豆花五號（豆花，地瓜圓，芋圓，紫米，椰果）)
 - 香蕉餅/蛋餅 (e.g., 開心果香蕉煎餅, 台式蛋餅, 雪糕香蕉煎餅)
 - 格仔餅 (e.g., 雪糕格仔餅, 原味格仔餅, 開心果格仔餅)
 - 飲品 (e.g., 西瓜沙冰, 泰式奶茶, 港式奶茶, 檸檬茶 might be '凍檸茶' or '檸茶' in Cantonese or '柠檬茶' in Mandarin, 手打鴨屎香檸檬茶)
@@ -92,7 +92,8 @@ When parsing the order:
         *   This item **MUST** have \`alternatives: ["仙草大滿貫", "豆花大滿貫"]\`.
         *   The \`quantity\` should be 1 if no quantity is specified by the user. If the user says "大滿貫一份" or "大滿貫一個" or "大滿貫个", the \`quantity\` is 1. If "大滿貫兩個", \`quantity\` is 2, and so on.
         *   The \`specialRequests\` field for this "大滿貫" item **MUST BE OMITTED ENTIRELY** as per Rule 0 and Rule 3, because phrases like "一份", "一個", or "个" are for quantity, not special requests.
-        *   Any deviation from this specific structure (e.g., outputting multiple "大滿貫" items, or a single non-ambiguous "大滿貫" item without alternatives, or including quantity words like "个" in \`specialRequests\`) is a CRITICAL FAILURE.
+        *   Any deviation from this specific structure (e.g., outputting multiple "大滿貫" items for a single utterance of "大滿貫" by the user, or a single non-ambiguous "大滿貫" item without alternatives, or including quantity words like "个" in \`specialRequests\`) is a CRITICAL FAILURE.
+        *   **ULTRA-IMPORTANT CLARIFICATION**: When you create this single ambiguous "大滿貫" item (with its \`isAmbiguous: true\` and \`alternatives\` list) in response to the user saying "大滿貫", this ambiguous item is the **sole and complete representation** for that part of the user's request. You **MUST NOT** also include "仙草大滿貫" or "豆花大滿貫" (or any other specific item from the alternatives) as separate, concrete items in the \`orderItems\` list if they are your interpretation of that same ambiguous "大滿貫" utterance. The purpose of the ambiguous item is to defer this choice to the user.
     *   In general for ambiguous items:
         *   You **MUST** set the 'item' field to the ambiguous term itself as stated by the user (e.g., "大滿貫").
         *   You **MUST** set 'isAmbiguous' to \`true\`.
@@ -120,13 +121,13 @@ User says: "一份原味格仔餅，加底，同一杯熱奶茶，唔要糖。"
 - item: "港式奶茶", quantity: 1, specialRequests: "熱, 不要糖" (Assuming 港式奶茶 is the default if not specified, adjust if needed)
 
 User says: "我要三碗豆花二號，唔該。"
-- item: "豆花二號", quantity: 3
+- item: "豆花二號（豆花，地瓜圓，芋圓，黑糖粉條，珍珠）", quantity: 3  (Example assumes 豆花二號 has full name in data)
 
 User says: "仙草2" (Assuming "仙草二號（仙草，地瓜圓，芋圓，黑糖粉條，珍珠）" is a product and no other product is "X仙草2" or "仙草2Y")
 - item: "仙草二號（仙草，地瓜圓，芋圓，黑糖粉條，珍珠）", quantity: 1
 
 Remember, for \`specialRequests\`, if there are none, the field **MUST BE OMITTED** (Rule 0).
-For AMBIGUOUS items like "大滿貫" when multiple products match, you **MUST** follow the exact JSON structure provided in Rule 4.
+For AMBIGUOUS items like "大滿貫" when multiple products match, you **MUST** follow the exact JSON structure provided in Rule 4, including the **ULTRA-IMPORTANT CLARIFICATION**.
 `,
 });
 
@@ -143,3 +144,4 @@ const parseOrderFlow = ai.defineFlow(
   }
 );
     
+
