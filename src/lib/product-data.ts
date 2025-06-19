@@ -50,11 +50,11 @@ export const mockProducts: Product[] = [
     imageUrl: 'https://placehold.co/300x200.png',
     "data-ai-hint": 'tofu pudding',
     description: '配料豐富的豆花大滿貫。',
-    order: 0 // Order within "豆花系列"
+    order: 0 
   },
   {
-    id: '10', // Assuming original ID for 豆花一號
-    name: '豆花一號', // Full name: 豆花一號（豆花，地瓜圓，芋圓，蜜紅豆，芋泥）
+    id: '10', 
+    name: '豆花一號', 
     price: 38.00,
     category: '豆花系列',
     imageUrl: 'https://placehold.co/300x200.png',
@@ -63,8 +63,8 @@ export const mockProducts: Product[] = [
     order: 1
   },
   {
-    id: '9', // Assuming original ID for 豆花二號
-    name: '豆花二號', // Full name: 豆花二號（豆花，地瓜圓，芋圓，黑糖粉條，珍珠）
+    id: '9', 
+    name: '豆花二號', 
     price: 36.00,
     category: '豆花系列',
     imageUrl: 'https://placehold.co/300x200.png',
@@ -73,8 +73,8 @@ export const mockProducts: Product[] = [
     order: 2
   },
   {
-    id: '8', // Assuming original ID for 豆花三號
-    name: '豆花三號', // Full name: 豆花三號（豆花，地瓜圓，芋圓，珍珠，椰果）
+    id: '8', 
+    name: '豆花三號', 
     price: 36.00,
     category: '豆花系列',
     imageUrl: 'https://placehold.co/300x200.png',
@@ -83,8 +83,8 @@ export const mockProducts: Product[] = [
     order: 3
   },
   {
-    id: '7', // Assuming original ID for 豆花四號
-    name: '豆花四號', // Full name: 豆花四號（豆花，地瓜圓，芋圓，小丸子，蜜紅豆）
+    id: '7', 
+    name: '豆花四號', 
     price: 36.00,
     category: '豆花系列',
     imageUrl: 'https://placehold.co/300x200.png',
@@ -93,8 +93,8 @@ export const mockProducts: Product[] = [
     order: 4
   },
   {
-    id: '6', // Assuming original ID for 豆花五號
-    name: '豆花五號', // Full name: 豆花五號（豆花，地瓜圓，芋圓，紫米，椰果）
+    id: '6', 
+    name: '豆花五號', 
     price: 36.00,
     category: '豆花系列',
     imageUrl: 'https://placehold.co/300x200.png',
@@ -110,7 +110,7 @@ export const mockProducts: Product[] = [
     imageUrl: 'https://placehold.co/300x200.png',
     "data-ai-hint": 'grass jelly',
     description: '配料豐富的仙草大滿貫。',
-    order: 0 // Order within "仙草系列"
+    order: 0 
   },
   {
     id: '16',

@@ -167,7 +167,6 @@ export default function AdminProductsPage() {
         }
       }
       
-      // Ensure all categories from storedOrderedNames are present in categoriesMap, even if they have 0 products
       storedOrderedNames.forEach(name => {
         if (!categoriesMap[name]) { 
           categoriesMap[name] = 0; 
@@ -192,12 +191,10 @@ export default function AdminProductsPage() {
         if (indexB !== -1) {
           return 1; 
         }
-        // Fallback sort for categories not in storedOrderedNames
         return a.name.localeCompare(b.name, 'zh-HK');
       });
       
       const finalOrderedCategories = [];
-      // Add categories based on storedOrderedNames first
       for (const name of storedOrderedNames) {
         const category = initialCategories.find(c => c.name === name);
         if (category) {
@@ -205,10 +202,9 @@ export default function AdminProductsPage() {
         }
       }
 
-      // Add any remaining categories (those in products but not in storedOrder)
       const remainingCategories = initialCategories
         .filter(c => !storedOrderedNames.includes(c.name))
-        .sort((a,b) => a.name.localeCompare(b.name, 'zh-HK')); // Ensure these are also sorted
+        .sort((a,b) => a.name.localeCompare(b.name, 'zh-HK')); 
       
       finalOrderedCategories.push(...remainingCategories);
       
@@ -295,7 +291,6 @@ export default function AdminProductsPage() {
 
     setIsDeletingCategory(true);
     try {
-      // Delete all products within this category
       const productsCol = collection(db, 'products');
       const q = query(productsCol, where('category', '==', categoryToDelete.name));
       const productsSnapshot = await getDocs(q);
@@ -308,10 +303,8 @@ export default function AdminProductsPage() {
         await batch.commit();
       }
       
-      // Update local state for categories
       setOrderedCategories(prev => prev.filter(c => c.id !== categoryToDelete.id));
       
-      // Update categoryDisplayOrder in Firestore
       const orderDocRef = doc(db, CATEGORY_ORDER_COLLECTION, CATEGORY_ORDER_DOC_ID);
       const orderDocSnap = await getDoc(orderDocRef);
       if (orderDocSnap.exists()) {
@@ -368,7 +361,6 @@ export default function AdminProductsPage() {
     const oldCategoryName = categoryToEdit.name;
 
     try {
-      // Update category for all products in this category
       const productsCol = collection(db, 'products');
       const q = query(productsCol, where('category', '==', oldCategoryName));
       const productsSnapshot = await getDocs(q);
@@ -381,7 +373,6 @@ export default function AdminProductsPage() {
         await batch.commit();
       }
       
-      // Update categoryDisplayOrder in Firestore
       const orderDocRef = doc(db, CATEGORY_ORDER_COLLECTION, CATEGORY_ORDER_DOC_ID);
       const orderDocSnap = await getDoc(orderDocRef);
       let newOrderedNamesList = [];
@@ -390,13 +381,10 @@ export default function AdminProductsPage() {
         if (data && Array.isArray(data.orderedNames)) {
             newOrderedNamesList = data.orderedNames.map((name: string) => name === oldCategoryName ? newName : name);
         } else {
-            // If orderedNames is malformed, initialize with the new name if no products exist for it yet,
-            // or rely on loadData to reconstruct order based on product categories.
-            // For simplicity, we update it, and loadData will re-sort based on this.
             newOrderedNamesList = [newName]; 
         }
       } else {
-        newOrderedNamesList = [newName]; // Create if doesn't exist
+        newOrderedNamesList = [newName]; 
       }
       await setDoc(orderDocRef, { orderedNames: newOrderedNamesList }, { merge: true });
       
@@ -406,7 +394,7 @@ export default function AdminProductsPage() {
         className: "bg-green-500 text-white border-green-600",
       });
       
-      setRefreshKey(prev => prev + 1); // Trigger data reload
+      setRefreshKey(prev => prev + 1); 
 
     } catch (error) {
       console.error(`Error updating category name for ${oldCategoryName}:`, error);
@@ -439,23 +427,19 @@ export default function AdminProductsPage() {
     }
 
     try {
-      // Update categoryDisplayOrder in Firestore
       const orderDocRef = doc(db, CATEGORY_ORDER_COLLECTION, CATEGORY_ORDER_DOC_ID);
       const orderDocSnap = await getDoc(orderDocRef);
       
       let currentOrderedNames: string[] = [];
       if (orderDocSnap.exists()) {
         const data = orderDocSnap.data();
-        // Ensure data.orderedNames is an array, default to empty array if not
         if (data && Array.isArray(data.orderedNames)) { 
           currentOrderedNames = data.orderedNames.filter((name): name is string => typeof name === 'string' && name.trim() !== '');
         } else {
-          // If orderedNames doesn't exist or is not an array, initialize as empty
           currentOrderedNames = [];
         }
       }
       
-      // Ensure currentOrderedNames is always an array before push
       if (!Array.isArray(currentOrderedNames)) {
            console.warn(`${CATEGORY_ORDER_DOC_ID} document's orderedNames was not an array. Reinitializing.`);
            currentOrderedNames = [];
@@ -474,7 +458,7 @@ export default function AdminProductsPage() {
 
       setIsNewCategoryDialogOpen(false);
       setNewCategoryNameForCreation('');
-      setRefreshKey(prev => prev + 1); // Trigger data reload
+      setRefreshKey(prev => prev + 1); 
     } catch (error) {
       console.error(`Error creating new category ${trimmedName}:`, error);
       toast({
@@ -493,19 +477,19 @@ export default function AdminProductsPage() {
       const productsCol = collection(db, 'products');
       const batch = writeBatch(db);
 
-      mockProducts.forEach((product: Product) => { // No index needed if using product.order
+      mockProducts.forEach((product: Product) => {
         const productIdString = String(product.id); 
         const productRef = doc(productsCol, productIdString);
         
         const productDataForFirestore: Product = {
           id: productIdString,
-          name: String(product.name),
+          name: String(product.name).trim(),
           price: Number(product.price) || 0,
-          category: String(product.category),
-          description: product.description || '',
+          category: String(product.category).trim(),
+          description: product.description ? String(product.description).trim() : '',
           imageUrl: product.imageUrl || `https://placehold.co/300x200.png`,
-          'data-ai-hint': product['data-ai-hint'] || product.name.toLowerCase().split(' ').slice(0,2).join(' ') || 'food item',
-          order: product.order, // Use order from mockProducts directly
+          'data-ai-hint': product['data-ai-hint']?.trim() || String(product.name).toLowerCase().split(' ').slice(0,2).join(' ').trim() || 'food item',
+          order: typeof product.order === 'number' ? product.order : 0, 
           options: product.options || [],
         };
         batch.set(productRef, productDataForFirestore);
@@ -513,8 +497,7 @@ export default function AdminProductsPage() {
 
       await batch.commit();
 
-      // Update categoryDisplayOrder based on mockProducts
-      const uniqueCategoriesFromSeed = Array.from(new Set(mockProducts.map(p => p.category.trim()).filter(Boolean)));
+      const uniqueCategoriesFromSeed = Array.from(new Set(mockProducts.map(p => String(p.category).trim()).filter(Boolean)));
       
       const orderDocRef = doc(db, CATEGORY_ORDER_COLLECTION, CATEGORY_ORDER_DOC_ID);
       const orderDocSnap = await getDoc(orderDocRef);
@@ -527,23 +510,13 @@ export default function AdminProductsPage() {
         }
       }
       
-      // Filter existingOrderedNames to only include those present in uniqueCategoriesFromSeed
       let updatedOrderedNames = existingOrderedNames.filter(name => uniqueCategoriesFromSeed.includes(name));
       
-      // Add new categories from seed data that are not already in updatedOrderedNames
       const newlyAddedCategoriesFromSeed = uniqueCategoriesFromSeed.filter(name => !updatedOrderedNames.includes(name));
-      // Sort newly added categories alphabetically (or by preferred locale) before appending
       newlyAddedCategoriesFromSeed.sort((a,b) => a.localeCompare(b, 'zh-HK'));
       
       updatedOrderedNames.push(...newlyAddedCategoriesFromSeed);
-      
-      // If updatedOrderedNames is still empty but uniqueCategoriesFromSeed is not, initialize with sorted uniqueCategoriesFromSeed
-      if (updatedOrderedNames.length === 0 && uniqueCategoriesFromSeed.length > 0) {
-          // This case is covered by the newlyAddedCategories logic if existingOrderedNames was empty
-          // We can simplify: if uniqueCategoriesFromSeed has items, updatedOrderedNames will get them.
-          // If uniqueCategoriesFromSeed is empty, updatedOrderedNames remains empty (or filtered empty).
-      }
-      
+            
       await setDoc(orderDocRef, { orderedNames: updatedOrderedNames });
 
       toast({
@@ -552,7 +525,7 @@ export default function AdminProductsPage() {
         className: "bg-green-500 text-white border-green-600",
         duration: 8000,
       });
-      setRefreshKey(prev => prev + 1); // Trigger data reload
+      setRefreshKey(prev => prev + 1); 
     } catch (error) {
       console.error("Error seeding database:", error);
       toast({
@@ -783,7 +756,4 @@ export default function AdminProductsPage() {
   );
 }
 
-    
-
-    
     

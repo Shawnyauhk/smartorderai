@@ -15,7 +15,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { extractProductsFromImage } from '@/ai/flows/extract-products-from-image-flow';
 import type { ExtractProductsOutput, ExtractedProduct } from '@/ai/flows/extract-products-from-image-flow';
-import { collection, writeBatch, doc } from 'firebase/firestore';
+import { collection, writeBatch, doc, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Product } from '@/types';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -33,7 +33,7 @@ export default function ImportProductsFromImagePage() {
   const router = useRouter();
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setExtractedData(null); // Clear previous results on new selection
+    setExtractedData(null); 
     setImageFiles([]);
     setImagePreviews([]);
 
@@ -43,7 +43,7 @@ export default function ImportProductsFromImagePage() {
       const skippedFiles: { name: string; reason: string }[] = [];
 
       for (const file of filesArray) {
-        if (file.size > 4 * 1024 * 1024) { // Check for 4MB limit
+        if (file.size > 4 * 1024 * 1024) { 
           skippedFiles.push({ name: file.name, reason: `檔案過大 (${(file.size / (1024*1024)).toFixed(2)}MB)，已略過。`});
           continue;
         }
@@ -67,12 +67,11 @@ export default function ImportProductsFromImagePage() {
             description: "所有選擇的圖片均因檔案過大而被略過。",
             variant: "destructive",
         });
-        if (fileInputRef.current) fileInputRef.current.value = ""; // Reset file input
+        if (fileInputRef.current) fileInputRef.current.value = ""; 
         return;
       }
       
       if (validFiles.length === 0) {
-        // No files selected or all were invalid from the start
         if (fileInputRef.current) fileInputRef.current.value = "";
         return;
       }
@@ -148,7 +147,6 @@ export default function ImportProductsFromImagePage() {
           }
         } else {
            console.warn(`AI did not return expected output structure for ${file.name}`);
-           // The flow should return { extractedProducts: [] } on error/no data
         }
       } catch (error) {
         console.error(`Error extracting products from image ${file.name}:`, error);
@@ -156,7 +154,7 @@ export default function ImportProductsFromImagePage() {
         if (error instanceof Error) {
           if (error.message.includes('SAFETY')) {
               description = `圖片 "${file.name}" 內容可能違反了 AI 安全政策，無法處理。`;
-          } else if (error.message.includes('4MB')) { // Should be caught by pre-check, but as a fallback
+          } else if (error.message.includes('4MB')) { 
               description = `圖片 "${file.name}" 檔案超過4MB上限，AI無法處理。`;
           } else {
             description = `分析圖片 "${file.name}" 時發生錯誤: ${error.message.substring(0,100)}${error.message.length > 100 ? '...' : ''}`;
@@ -176,21 +174,21 @@ export default function ImportProductsFromImagePage() {
         className: "bg-green-500 text-white border-green-600",
         duration: errorDetails.length > 0 ? 10000 : 7000,
       });
-    } else if (errorDetails.length === imageFiles.length) { // All images failed
+    } else if (errorDetails.length === imageFiles.length) { 
        toast({
           title: "所有圖片提取失敗",
           description: "AI 未能從任何上傳的圖片中識別出產品資訊。請檢查下方錯誤詳情。",
           variant: "destructive",
           duration: 10000,
         });
-    } else if (errorDetails.length > 0) { // Some images failed, some might have succeeded but found 0 products
+    } else if (errorDetails.length > 0) { 
          toast({
           title: "部分圖片提取失敗",
           description: `AI 未能從 ${errorDetails.length} 張圖片中識別產品。其他圖片處理完成。`,
           variant: "destructive",
           duration: 7000,
         });
-    } else { // No products found from any image, and no errors during processing
+    } else { 
          toast({
           title: "未提取到產品",
           description: "AI 未能從上傳的圖片中識別出任何產品資訊。請嘗試更清晰的圖片或調整提示。",
@@ -224,31 +222,62 @@ export default function ImportProductsFromImagePage() {
     try {
       const batch = writeBatch(db);
       const productsCollection = collection(db, 'products');
+      
+      // Helper map to keep track of the next order number for each category being processed in this batch
+      const categoryOrderTracker: Record<string, number> = {}; 
 
-      extractedData.extractedProducts.forEach((extractedProduct: ExtractedProduct) => {
-        const newProductRef = doc(productsCollection); // Auto-generate ID
+      for (const extractedProduct of extractedData.extractedProducts) {
+        const newProductRef = doc(productsCollection); 
+
+        const productName = (extractedProduct.name || "Unnamed Product").trim();
+        const productCategory = (extractedProduct.category || "Uncategorized").trim();
 
         let defaultAiHint = 'food item';
-        const productName = extractedProduct.name || "Unnamed Product"; 
-        const productCategory = extractedProduct.category || "Uncategorized"; 
-
         if (productName !== "Unnamed Product") {
             defaultAiHint = productName.split(/\s+/).slice(0, 2).join(' ').toLowerCase();
         } else if (productCategory !== "Uncategorized") {
             defaultAiHint = productCategory.split(/\s+/).slice(0, 2).join(' ').toLowerCase();
         }
+
+        let orderForThisProduct: number;
+
+        // Check if we've already determined the starting order for this category in this batch
+        if (categoryOrderTracker[productCategory] === undefined) {
+          // Fetch the current max order for this category from Firestore
+          const productsInCategoryQuery = query(
+            collection(db, 'products'), 
+            where('category', '==', productCategory),
+            orderBy('order', 'desc'),
+            limit(1)
+          );
+          const querySnapshot = await getDocs(productsInCategoryQuery);
+          let maxOrderInDb = -1;
+          if (!querySnapshot.empty) {
+            const lastProduct = querySnapshot.docs[0].data() as Product;
+            if (typeof lastProduct.order === 'number') {
+              maxOrderInDb = lastProduct.order;
+            }
+          }
+          orderForThisProduct = maxOrderInDb + 1;
+        } else {
+          // We've processed this category before in this batch, increment the order
+          orderForThisProduct = categoryOrderTracker[productCategory] + 1;
+        }
+        // Update the tracker for the next product in the same category within this batch
+        categoryOrderTracker[productCategory] = orderForThisProduct;
         
         const productData: Product = {
           id: newProductRef.id,
           name: productName,
           price: typeof extractedProduct.price === 'number' ? extractedProduct.price : 0,
           category: productCategory,
-          description: extractedProduct.description || '',
+          description: (extractedProduct.description || '').trim(),
           imageUrl: 'https://placehold.co/300x200.png',
-          'data-ai-hint': defaultAiHint,
+          'data-ai-hint': defaultAiHint.trim(),
+          order: orderForThisProduct, // Assign the calculated order
         };
         batch.set(newProductRef, productData);
-      });
+      }
 
       await batch.commit();
       toast({
@@ -266,7 +295,7 @@ export default function ImportProductsFromImagePage() {
       console.error("Error saving products to Firestore:", error);
       toast({
         title: "儲存失敗",
-        description: "儲存產品到資料庫時發生錯誤，請檢查主控台取得更多資訊。",
+        description: `儲存產品到資料庫時發生錯誤: ${(error as Error).message}`,
         variant: "destructive",
       });
     } finally {
@@ -322,7 +351,8 @@ export default function ImportProductsFromImagePage() {
                         <Image
                           src={previewSrc}
                           alt={`預覽圖片 ${index + 1}`}
-                          layout="fill"
+                          fill // Changed from layout="fill" to fill
+                          sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, 25vw" // Added sizes for responsive images
                           objectFit="contain"
                           className="p-1"
                         />
@@ -341,7 +371,7 @@ export default function ImportProductsFromImagePage() {
                 className="w-full max-w-md text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" 
                 onChange={handleImageChange} 
                 accept="image/png, image/jpeg, image/gif"
-                multiple // Allow multiple file selection
+                multiple 
               />
             </div>
           </div>
@@ -425,3 +455,5 @@ export default function ImportProductsFromImagePage() {
     </div>
   );
 }
+
+    
