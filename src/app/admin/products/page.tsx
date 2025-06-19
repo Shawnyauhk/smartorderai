@@ -38,7 +38,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger, // Keep this import if other parts of the page use it, but SortableCategoryCard won't.
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
 type CategoryEntry = { id: string; name: string; count: number };
@@ -77,13 +77,12 @@ function SortableCategoryCard({ categoryItem, children, onDeleteRequest }: Sorta
       >
         <GripVertical className="h-5 w-5" />
       </button>
-      {/* Removed AlertDialogTrigger from here */}
       <Button 
           variant="ghost" 
           size="icon" 
           className="absolute top-1 right-1 p-1 text-destructive hover:bg-destructive/10 opacity-0 group-hover/categorycard:opacity-100 transition-opacity"
           onClick={(e) => {
-            e.stopPropagation(); // Prevent link navigation
+            e.stopPropagation(); 
             onDeleteRequest(categoryItem);
           }}
           aria-label={`刪除系列 ${categoryItem.name}`}
@@ -289,7 +288,7 @@ export default function AdminProductsPage() {
             </Button>
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="outline" className="border-accent text-accent hover:bg-accent/10 hover:text-accent shadow-md hover:shadow-lg transition-shadow" disabled={isSeeding || isLoading}>
+                <Button variant="outline" className="border-accent-foreground text-accent-foreground hover:bg-accent/20 hover:text-accent-foreground shadow-md hover:shadow-lg transition-shadow" disabled={isSeeding || isLoading}>
                   {isSeeding ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <DatabaseZap className="mr-2 h-5 w-5" />}
                   {isSeeding ? "導入中..." : "從模擬數據導入產品"}
                 </Button>
