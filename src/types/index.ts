@@ -1,3 +1,4 @@
+
 export interface Product {
   id: string;
   name: string;
@@ -7,6 +8,7 @@ export interface Product {
   imageUrl?: string;
   // For AI hint for image search for placeholders
   "data-ai-hint"?: string; 
+  order?: number; // Added for sortable products within a category
   options?: {
     name: string;
     choices: { name: string; priceAdjustment?: number }[];
@@ -38,3 +40,5 @@ export interface ParsedAiOrderItem {
   isAmbiguous?: boolean;
   alternatives?: string[];
 }
+
+    

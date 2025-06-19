@@ -6,7 +6,7 @@ import ProductCard from '@/components/ProductCard';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { ArrowLeftCircle, ListOrdered, GripVertical, Trash2, Loader2, PlusCircle } from 'lucide-react';
+import { ArrowLeftCircle, ListOrdered, GripVertical, Trash2, Loader2, PlusCircle, Save } from 'lucide-react';
 import type { Product } from '@/types';
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -27,7 +27,7 @@ import {
   rectSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { collection, getDocs, query, where, orderBy, doc, deleteDoc, writeBatch } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, doc, deleteDoc, writeBatch, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -97,6 +97,7 @@ export default function CategoryProductsPage({ params: paramsPromise }: Props) {
   const decodedCategory = decodeURIComponent(params.category);
   const [orderedProducts, setOrderedProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSavingOrder, setIsSavingOrder] = useState(false);
   const { toast } = useToast();
 
   const [productToDelete, setProductToDelete] = useState<{id: string; name: string} | null>(null);
@@ -109,10 +110,15 @@ export default function CategoryProductsPage({ params: paramsPromise }: Props) {
   const fetchProducts = useCallback(async () => {
     if (!decodedCategory) return;
     setIsLoading(true);
-    setSelectedProductIds(new Set()); // Reset selection on fetch
+    setSelectedProductIds(new Set()); 
     try {
       const productsCol = collection(db, 'products');
-      const q = query(productsCol, where('category', '==', decodedCategory), orderBy('name'));
+      // Order by the 'order' field first, then by 'name' as a fallback
+      const q = query(productsCol, 
+        where('category', '==', decodedCategory), 
+        orderBy('order', 'asc'),
+        orderBy('name', 'asc') 
+      );
       const productsSnapshot = await getDocs(q);
       const fetchedProducts: Product[] = productsSnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Product));
       
@@ -126,11 +132,12 @@ export default function CategoryProductsPage({ params: paramsPromise }: Props) {
           description: (
             <div>
               <p>Firestore 需要一個複合索引來執行此查詢。錯誤訊息中應包含建立索引的連結。</p>
+              <p>您可能需要為 'products' 集合建立一個包含 'category' (ASC), 'order' (ASC) 和 'name' (ASC) 的複合索引。</p>
               <p className="mt-2 text-xs">錯誤詳情: {(error as Error).message}</p>
             </div>
           ),
           variant: "destructive",
-          duration: 10000,
+          duration: 15000,
         });
       } else {
         toast({
@@ -150,11 +157,42 @@ export default function CategoryProductsPage({ params: paramsPromise }: Props) {
   }, [decodedCategory, fetchProducts]);
 
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }), // Add distance constraint
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
   );
+
+  const saveProductOrder = async (productsToSave: Product[]) => {
+    if (productsToSave.length === 0) return;
+    setIsSavingOrder(true);
+    const batch = writeBatch(db);
+    productsToSave.forEach((product, index) => {
+      const productRef = doc(db, 'products', product.id);
+      batch.update(productRef, { order: index });
+    });
+
+    try {
+      await batch.commit();
+      toast({
+        title: "排序已儲存",
+        description: `產品在 ${decodedCategory} 系列中的新順序已成功儲存。`,
+        className: "bg-green-500 text-white border-green-600",
+      });
+    } catch (error) {
+      console.error("Error saving product order:", error);
+      toast({
+        title: "儲存排序失敗",
+        description: "儲存產品排序時發生錯誤。請重試。",
+        variant: "destructive",
+      });
+      // Optionally, refetch products to revert to last saved order
+      // fetchProducts(); 
+    } finally {
+      setIsSavingOrder(false);
+    }
+  };
+
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
@@ -162,8 +200,10 @@ export default function CategoryProductsPage({ params: paramsPromise }: Props) {
       setOrderedProducts((items) => {
         const oldIndex = items.findIndex((item) => item.id === active.id);
         const newIndex = items.findIndex((item) => item.id === over.id);
+        if (oldIndex === -1 || newIndex === -1) return items; // Should not happen
+        
         const movedItems = arrayMove(items, oldIndex, newIndex);
-        // Potentially save new order to backend here if needed
+        saveProductOrder(movedItems); // Save the new order
         return movedItems;
       });
     }
@@ -178,6 +218,9 @@ export default function CategoryProductsPage({ params: paramsPromise }: Props) {
     setIsDeletingProduct(true);
     try {
       await deleteDoc(doc(db, 'products', productToDelete.id));
+      // No need to manually filter here, as fetchProducts will be called if products change,
+      // or the order will be re-saved if deletion affects order.
+      // For immediate UI update:
       setOrderedProducts(prev => prev.filter(p => p.id !== productToDelete.id));
       setSelectedProductIds(prev => {
         const newSelected = new Set(prev);
@@ -271,13 +314,13 @@ export default function CategoryProductsPage({ params: paramsPromise }: Props) {
             {decodedCategory}
           </h1>
           <p className="text-lg text-muted-foreground mt-1">
-            瀏覽 {decodedCategory} 系列中的所有產品。您可以拖動卡片調整產品順序，編輯、選擇或刪除產品。
+            瀏覽 {decodedCategory} 系列中的所有產品。您可以拖動卡片調整產品順序（順序將自動儲存）、編輯、選擇或刪除產品。
           </p>
         </div>
         <Button size="lg" asChild className="shadow-md hover:shadow-lg transition-shadow transform hover:scale-105 self-start sm:self-auto mt-4 sm:mt-0">
-          <Link href="/admin/products/add">
+          <Link href={`/admin/products/add?category=${encodeURIComponent(decodedCategory)}`}>
             <PlusCircle className="mr-2 h-5 w-5" />
-            新增產品
+            新增產品到此系列
           </Link>
         </Button>
       </div>
@@ -290,7 +333,7 @@ export default function CategoryProductsPage({ params: paramsPromise }: Props) {
                     aria-label="全選/取消全選當前頁產品"
                     checked={isAllSelected ? true : (isSomeSelected ? 'indeterminate' : false)}
                     onCheckedChange={handleToggleSelectAll}
-                    disabled={isLoading || orderedProducts.length === 0}
+                    disabled={isLoading || orderedProducts.length === 0 || isSavingOrder}
                 />
                 <Label htmlFor="select-all-products" className="ml-2 text-sm font-medium text-foreground">
                     {isAllSelected ? "取消全選" : "全選"} ({selectedProductIds.size} / {orderedProducts.length})
@@ -300,12 +343,18 @@ export default function CategoryProductsPage({ params: paramsPromise }: Props) {
                 variant="destructive"
                 size="sm"
                 onClick={() => { if (selectedProductIds.size > 0) setIsBatchDeleteDialogOpen(true); }}
-                disabled={selectedProductIds.size === 0 || isDeletingBatch || isLoading}
+                disabled={selectedProductIds.size === 0 || isDeletingBatch || isLoading || isSavingOrder}
                 className="transition-opacity hover:opacity-90"
             >
                 {isDeletingBatch ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
                 批量刪除選中 ({selectedProductIds.size})
             </Button>
+             {isSavingOrder && (
+                <div className="flex items-center text-sm text-muted-foreground ml-auto">
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin text-primary" />
+                    正在儲存排序...
+                </div>
+            )}
         </div>
       )}
       
@@ -390,8 +439,9 @@ export default function CategoryProductsPage({ params: paramsPromise }: Props) {
         </div>
       )}
       <p className="text-sm text-muted-foreground mt-4 text-center">
-        提示：目前的拖曳排序僅在當前頁面有效，刷新後將重置。如需永久儲存排序，需後續開發。
+        提示：產品拖曳排序結果將自動儲存到資料庫。
       </p>
     </div>
   );
 }
+    

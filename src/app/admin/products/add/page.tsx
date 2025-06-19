@@ -12,9 +12,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { useToast } from '@/hooks/use-toast';
 import { db, storage } from '@/lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { addDoc, collection } from 'firebase/firestore';
+import { addDoc, collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
 import { ArrowLeftCircle, PlusCircle, Loader2, UploadCloud } from 'lucide-react';
 import Link from 'next/link';
+import type { Product } from '@/types';
 
 export default function AddProductPage() {
   const [name, setName] = useState('');
@@ -52,7 +53,7 @@ export default function AddProductPage() {
     }
 
     setIsLoading(true);
-    let imageUrl = '';
+    let imageUrl = 'https://placehold.co/300x200.png'; // Default placeholder
     let finalDataAiHint = dataAiHint.trim() ? dataAiHint.trim().toLowerCase() : 'food item';
 
 
@@ -64,13 +65,32 @@ export default function AddProductPage() {
         imageUrl = await getDownloadURL(storageRef);
       }
 
-      const productData = {
+      // Determine the order for the new product
+      let newProductOrder = 0;
+      const productsInCategoryQuery = query(
+        collection(db, 'products'), 
+        where('category', '==', category.trim()),
+        orderBy('order', 'desc'),
+        limit(1)
+      );
+      const querySnapshot = await getDocs(productsInCategoryQuery);
+      if (!querySnapshot.empty) {
+        const lastProduct = querySnapshot.docs[0].data() as Product;
+        if (typeof lastProduct.order === 'number') {
+          newProductOrder = lastProduct.order + 1;
+        }
+      }
+      // If no products or no 'order' field found, newProductOrder remains 0, which is fine for the first item.
+
+
+      const productData: Omit<Product, 'id'> = {
         name: name.trim(),
         price: parseFloat(price),
         category: category.trim(),
         description: description.trim(),
         imageUrl: imageUrl,
-        'data-ai-hint': finalDataAiHint, 
+        'data-ai-hint': finalDataAiHint,
+        order: newProductOrder,
       };
 
       await addDoc(collection(db, 'products'), productData);
@@ -80,7 +100,7 @@ export default function AddProductPage() {
         description: `${name} 已成功新增到資料庫。`,
         className: "bg-green-500 text-white border-green-600",
       });
-      router.push('/admin/products'); 
+      router.push(`/admin/products/${encodeURIComponent(category.trim())}`); 
     } catch (error) {
       console.error("Error adding product:", error);
       toast({
@@ -108,7 +128,7 @@ export default function AddProductPage() {
             新增產品
           </CardTitle>
           <CardDescription className="text-lg">
-            填寫以下表格以新增產品到您的菜單。
+            填寫以下表格以新增產品到您的菜單。產品將預設排在所選系列的末尾。
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
@@ -217,3 +237,4 @@ export default function AddProductPage() {
     </div>
   );
 }
+    
