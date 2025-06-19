@@ -41,7 +41,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
                 // Fallback for broken images
                 const target = e.target as HTMLImageElement;
                 target.onerror = null; // Prevent infinite loop if placeholder also fails
-                target.src = `https://placehold.co/300x200.png?text=${encodeURIComponent(product.name)}`;
+                target.src = 'https://placehold.co/300x200.png';
               }}
             />
           </div>
@@ -49,7 +49,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
         {!product.imageUrl && (
            <div className="aspect-[4/3] w-full relative overflow-hidden bg-muted flex items-center justify-center">
             <Image
-                src={`https://placehold.co/300x200.png?text=${encodeURIComponent(product.name)}`}
+                src={'https://placehold.co/300x200.png'}
                 alt={product.name}
                 width={300}
                 height={200}

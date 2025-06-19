@@ -244,7 +244,7 @@ export default function ImportProductsFromImagePage() {
           price: typeof extractedProduct.price === 'number' ? extractedProduct.price : 0,
           category: productCategory,
           description: extractedProduct.description || '',
-          imageUrl: `https://placehold.co/300x200.png?text=${encodeURIComponent(productName)}`,
+          imageUrl: 'https://placehold.co/300x200.png',
           'data-ai-hint': defaultAiHint,
         };
         batch.set(newProductRef, productData);
@@ -425,5 +425,3 @@ export default function ImportProductsFromImagePage() {
     </div>
   );
 }
-    
-

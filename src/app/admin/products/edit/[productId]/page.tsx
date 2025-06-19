@@ -1,3 +1,4 @@
+
 "use client";
 
 import type React from 'react';
@@ -20,6 +21,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 const CATEGORY_ORDER_COLLECTION = 'app_configuration';
 const CATEGORY_ORDER_DOC_ID = 'categoryDisplayOrder';
+
+// Helper function to check if a URL is a Firebase Storage URL
+const isFirebaseStorageUrl = (url: string | null | undefined): boolean => {
+  if (!url) return false;
+  return url.startsWith('https://firebasestorage.googleapis.com');
+};
 
 export default function EditProductPage() {
   const router = useRouter();
@@ -96,7 +103,6 @@ export default function EditProductPage() {
     const fetchAllUniqueCategories = async () => {
       setIsFetchingCategories(true);
       try {
-        // 1. Fetch categories from existing products
         const productsCol = collection(db, 'products');
         const productsSnapshot = await getDocs(productsCol);
         const productBasedCategories = new Set<string>();
@@ -107,36 +113,32 @@ export default function EditProductPage() {
           }
         });
 
-        // 2. Fetch ordered category names from app_configuration
         let storedOrderedCategoryNames: string[] = [];
         const orderDocRef = doc(db, CATEGORY_ORDER_COLLECTION, CATEGORY_ORDER_DOC_ID);
         const orderDocSnap = await getDoc(orderDocRef);
         if (orderDocSnap.exists()) {
           const data = orderDocSnap.data();
           if (data && Array.isArray(data.orderedNames)) {
-            storedOrderedCategoryNames = data.orderedNames.filter(name => typeof name === 'string' && name.trim() !== '');
+            storedOrderedCategoryNames = data.orderedNames.filter((name): name is string => typeof name === 'string' && name.trim() !== '');
           }
         }
         
-        // 3. Combine and ensure uniqueness
         const combinedCategoriesSet = new Set<string>([...storedOrderedCategoryNames, ...Array.from(productBasedCategories)]);
         let allUniqueCategoriesArray = Array.from(combinedCategoriesSet);
 
-        // 4. Sort the categories
         allUniqueCategoriesArray.sort((a, b) => {
             const indexA = storedOrderedCategoryNames.indexOf(a);
             const indexB = storedOrderedCategoryNames.indexOf(b);
 
-            if (indexA !== -1 && indexB !== -1) { // Both in stored order
+            if (indexA !== -1 && indexB !== -1) { 
                 return indexA - indexB;
             }
-            if (indexA !== -1) { // A is in stored order, B is not
+            if (indexA !== -1) { 
                 return -1;
             }
-            if (indexB !== -1) { // B is in stored order, A is not
+            if (indexB !== -1) { 
                 return 1;
             }
-            // Neither in stored order, sort alphabetically
             return a.localeCompare(b, 'zh-HK');
         });
         
@@ -149,7 +151,7 @@ export default function EditProductPage() {
           description: "讀取可用產品系列時發生錯誤。",
           variant: "destructive",
         });
-        setAvailableCategories([]); // Fallback to empty array on error
+        setAvailableCategories([]); 
       } finally {
         setIsFetchingCategories(false);
       }
@@ -160,21 +162,16 @@ export default function EditProductPage() {
 
   useEffect(() => {
     const currentProductCategory = product?.category?.trim();
-    // Start with the globally available categories
     const newOptionsSet = new Set(availableCategories);
 
-    // Ensure the current product's category is always an option,
-    // even if it's somehow not in the global list (e.g., if it was just changed and not yet reflected elsewhere)
     if (currentProductCategory) {
       newOptionsSet.add(currentProductCategory);
     }
     
     let finalOptionsArray = Array.from(newOptionsSet);
 
-    // Re-sort based on the logic that availableCategories should already be sorted by stored order then alphabetically
-    // This ensures that if currentProductCategory was added, it gets sorted correctly.
     finalOptionsArray.sort((a, b) => {
-        const indexA = availableCategories.indexOf(a); // Use the sort order from availableCategories
+        const indexA = availableCategories.indexOf(a); 
         const indexB = availableCategories.indexOf(b);
 
         if (indexA !== -1 && indexB !== -1) {
@@ -186,7 +183,6 @@ export default function EditProductPage() {
         if (indexB !== -1) {
             return 1;
         }
-        // Fallback for categories not in availableCategories (should be rare, mainly for the current product's category if it was new)
         return a.localeCompare(b, 'zh-HK');
     });
     
@@ -246,7 +242,7 @@ export default function EditProductPage() {
         newImageUrl = await getDownloadURL(storageRef);
         productDataToUpdate.imageUrl = newImageUrl;
 
-        if (oldImageUrl && oldImageUrl !== newImageUrl) {
+        if (oldImageUrl && oldImageUrl !== newImageUrl && isFirebaseStorageUrl(oldImageUrl)) {
           try {
             const oldImageRef = ref(storage, oldImageUrl);
             await deleteObject(oldImageRef);
@@ -260,7 +256,7 @@ export default function EditProductPage() {
         }
       } else if (imageRemoved) { 
          productDataToUpdate.imageUrl = ''; 
-         if (oldImageUrl) { 
+         if (oldImageUrl && isFirebaseStorageUrl(oldImageUrl)) { 
             try {
                 const oldImageRef = ref(storage, oldImageUrl);
                 await deleteObject(oldImageRef);
@@ -475,4 +471,3 @@ export default function EditProductPage() {
     </div>
   );
 }
-
