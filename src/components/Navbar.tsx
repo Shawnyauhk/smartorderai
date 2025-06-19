@@ -13,8 +13,9 @@ const Navbar = () => {
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
+    // This effect runs only on the client, after the initial render
     setIsMounted(true);
-  }, []); // 空依賴陣列確保此 effect 僅在客戶端掛載時執行一次
+  }, []); // Empty dependency array ensures this runs once on mount
 
   const navItems = [
     { href: '/', label: '點餐', icon: ShoppingBasket },
@@ -33,12 +34,12 @@ const Navbar = () => {
           </Link>
           <div className="flex items-center space-x-2 sm:space-x-4">
             {navItems.map((item) => {
-              // 在伺服器端和客戶端初始渲染時，isMounted 為 false，因此 isActive 也為 false。
-              // 這確保了伺服器和初始客戶端渲染對於這些屬性是一致的。
+              // On the server and initial client render, isMounted is false, so isActive is false.
+              // This ensures consistency between server and initial client HTML.
               const isActive = isMounted && pathname === item.href;
               
               return (
-                <Link key={item.href} href={item.href}>
+                <Link key={item.href} href={item.href} legacyBehavior={false}>
                   <Button
                     variant={isActive ? 'default' : 'outline'}
                     className={cn(
@@ -47,7 +48,7 @@ const Navbar = () => {
                         ? "bg-primary text-primary-foreground scale-105 shadow-lg" 
                         : "text-foreground/80 hover:bg-accent hover:text-accent-foreground" 
                     )}
-                    aria-current={isActive ? 'page' : undefined} // 這在伺服器端應該是 'undefined'
+                    aria-current={isActive ? 'page' : undefined} // Server & initial client: undefined
                   >
                     <item.icon className="mr-0 sm:mr-2 h-5 w-5" />
                     <span className="hidden sm:inline">{item.label}</span>
