@@ -12,11 +12,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { useToast } from '@/hooks/use-toast';
 import { db, storage } from '@/lib/firebase';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, getDocs } from 'firebase/firestore';
 import { ArrowLeftCircle, Edit3, Loader2, UploadCloud, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import type { Product } from '@/types';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function EditProductPage() {
   const router = useRouter();
@@ -33,16 +34,20 @@ export default function EditProductPage() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   
-  const [isFetching, setIsFetching] = useState(true);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isFetchingProduct, setIsFetchingProduct] = useState(true);
+  const [isLoading, setIsLoading] = useState(false); // For submit button
   const [imageRemoved, setImageRemoved] = useState(false);
+
+  const [availableCategories, setAvailableCategories] = useState<string[]>([]);
+  const [isFetchingCategories, setIsFetchingCategories] = useState(true);
+  const [categoryOptions, setCategoryOptions] = useState<string[]>([]);
 
 
   const { toast } = useToast();
 
   const fetchProductDetails = useCallback(async () => {
     if (!productId) return;
-    setIsFetching(true);
+    setIsFetchingProduct(true);
     try {
       const productDocRef = doc(db, 'products', productId);
       const productSnap = await getDoc(productDocRef);
@@ -56,6 +61,8 @@ export default function EditProductPage() {
         setDescription(productData.description || '');
         setDataAiHint(productData['data-ai-hint'] || '');
         setCurrentImageUrl(productData.imageUrl || null);
+        setImagePreview(null); // Reset preview on new product load
+        setImageFile(null); // Reset file on new product load
         setImageRemoved(false);
       } else {
         toast({
@@ -73,7 +80,7 @@ export default function EditProductPage() {
         variant: "destructive",
       });
     } finally {
-      setIsFetching(false);
+      setIsFetchingProduct(false);
     }
   }, [productId, router, toast]);
 
@@ -83,14 +90,55 @@ export default function EditProductPage() {
     }
   }, [productId, fetchProductDetails]);
 
+  useEffect(() => {
+    const fetchAllCategories = async () => {
+      setIsFetchingCategories(true);
+      try {
+        const productsCol = collection(db, 'products');
+        const productsSnapshot = await getDocs(productsCol);
+        const categorySet = new Set<string>();
+        productsSnapshot.forEach(docSnap => {
+          const data = docSnap.data();
+          if (data.category && typeof data.category === 'string' && data.category.trim() !== '') {
+            categorySet.add(data.category.trim());
+          }
+        });
+        const sortedCategories = Array.from(categorySet).sort((a, b) => a.localeCompare(b, 'zh-HK'));
+        setAvailableCategories(sortedCategories);
+      } catch (error) {
+        console.error("Error fetching categories:", error);
+        toast({
+          title: "讀取產品系列失敗",
+          description: "讀取可用產品系列時發生錯誤。",
+          variant: "destructive",
+        });
+        setAvailableCategories([]);
+      } finally {
+        setIsFetchingCategories(false);
+      }
+    };
+    fetchAllCategories();
+  }, [toast]);
+
+  useEffect(() => {
+    const currentProductCategory = product?.category?.trim();
+    if (currentProductCategory) {
+      const newOptionsSet = new Set(availableCategories);
+      newOptionsSet.add(currentProductCategory); // Ensure current product's category is always an option
+      setCategoryOptions(Array.from(newOptionsSet).sort((a, b) => a.localeCompare(b, 'zh-HK')));
+    } else {
+      setCategoryOptions(availableCategories); // If no product or product.category, use fetched categories directly
+    }
+  }, [product, availableCategories]);
+
+
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setImageFile(file);
       setImagePreview(URL.createObjectURL(file));
-      setImageRemoved(false); // If a new image is selected, it's not "removed"
+      setImageRemoved(false); 
     } else {
-      // If no file is selected (e.g., user cancels file dialog), revert to current image or nothing
       setImageFile(null);
       setImagePreview(null); 
     }
@@ -99,8 +147,8 @@ export default function EditProductPage() {
   const handleRemoveImage = () => {
     setImageFile(null);
     setImagePreview(null);
-    setCurrentImageUrl(null); // Visually remove current image
-    setImageRemoved(true); // Mark that the image should be removed on save
+    setCurrentImageUrl(null); 
+    setImageRemoved(true); 
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -115,7 +163,7 @@ export default function EditProductPage() {
     }
 
     setIsLoading(true);
-    let newImageUrl = product?.imageUrl || ''; // Keep old image URL by default
+    let newImageUrl = product?.imageUrl || ''; 
     const oldImageUrl = product?.imageUrl;
 
 
@@ -128,20 +176,18 @@ export default function EditProductPage() {
         'data-ai-hint': dataAiHint.trim() ? dataAiHint.trim().toLowerCase() : (name.trim().toLowerCase() || 'food item'),
       };
 
-      if (imageFile) { // New image uploaded
+      if (imageFile) { 
         const imageName = `${Date.now()}_${imageFile.name.replace(/\s+/g, '_')}`;
         const storageRef = ref(storage, `products/${imageName}`);
         await uploadBytes(storageRef, imageFile);
         newImageUrl = await getDownloadURL(storageRef);
         productDataToUpdate.imageUrl = newImageUrl;
 
-        // Optional: Delete old image from storage if it existed and is different
         if (oldImageUrl && oldImageUrl !== newImageUrl) {
           try {
             const oldImageRef = ref(storage, oldImageUrl);
             await deleteObject(oldImageRef);
           } catch (deleteError: any) {
-            // Log error but don't block update if deletion fails
             if (deleteError.code === 'storage/object-not-found'){
                  console.warn("Old image not found in storage, skipping deletion:", oldImageUrl);
             } else {
@@ -149,9 +195,9 @@ export default function EditProductPage() {
             }
           }
         }
-      } else if (imageRemoved) { // Image explicitly removed by user
-         productDataToUpdate.imageUrl = ''; // Set to empty string or specific placeholder
-         if (oldImageUrl) { // If there was an old image, try to delete it
+      } else if (imageRemoved) { 
+         productDataToUpdate.imageUrl = ''; 
+         if (oldImageUrl) { 
             try {
                 const oldImageRef = ref(storage, oldImageUrl);
                 await deleteObject(oldImageRef);
@@ -164,17 +210,17 @@ export default function EditProductPage() {
             }
          }
       }
-      // If no new image and not removed, imageUrl remains as fetched (or updated if new one was uploaded)
-
+      
       const productDocRef = doc(db, 'products', productId);
-      await updateDoc(productDocRef, productDataToUpdate);
+      await updateDoc(productDocRef, productDataToUpdate as { [x: string]: any });
+
 
       toast({
         title: "產品更新成功！",
         description: `${name} 已成功更新。`,
         className: "bg-green-500 text-white border-green-600",
       });
-      router.push(`/admin/products/${encodeURIComponent(category)}`); 
+      router.push(`/admin/products/${encodeURIComponent(categoryData.trim())}`); 
     } catch (error) {
       console.error("Error updating product:", error);
       toast({
@@ -186,8 +232,10 @@ export default function EditProductPage() {
       setIsLoading(false);
     }
   };
+  
+  const categoryData = category; // Use the state variable for category
 
-  if (isFetching) {
+  if (isFetchingProduct) {
     return (
       <div className="flex justify-center items-center min-h-[calc(100vh-200px)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -196,7 +244,7 @@ export default function EditProductPage() {
     );
   }
 
-  if (!product) {
+  if (!product && !isFetchingProduct) { // Ensure product is null AND not fetching anymore
     return (
       <div className="text-center py-12">
         <p className="text-xl text-destructive">找不到產品資料。</p>
@@ -224,7 +272,7 @@ export default function EditProductPage() {
             編輯產品
           </CardTitle>
           <CardDescription className="text-lg">
-            修改產品「{product.name}」的詳細資料。
+            修改產品「{product?.name}」的詳細資料。
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
@@ -238,6 +286,7 @@ export default function EditProductPage() {
                 placeholder="例如：草莓葫蘆"
                 required
                 className="text-base"
+                disabled={isFetchingProduct || isFetchingCategories || isLoading}
               />
             </div>
 
@@ -253,18 +302,33 @@ export default function EditProductPage() {
                   required
                   step="0.01"
                   className="text-base"
+                  disabled={isFetchingProduct || isFetchingCategories || isLoading}
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="category" className="text-base">產品分類*</Label>
-                <Input
-                  id="category"
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  placeholder="例如：小食"
-                  required
-                  className="text-base"
-                />
+                <Select
+                    value={category}
+                    onValueChange={(value) => setCategory(value)}
+                    disabled={isFetchingProduct || isFetchingCategories || isLoading}
+                >
+                    <SelectTrigger id="category" className="text-base">
+                        <SelectValue placeholder="選擇產品分類" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {isFetchingCategories ? (
+                            <SelectItem value="loading" disabled>正在載入系列...</SelectItem>
+                        ) : categoryOptions.length === 0 ? (
+                            <SelectItem value="no-categories" disabled>沒有可用的系列</SelectItem>
+                        ) : (
+                            categoryOptions.map((cat) => (
+                            <SelectItem key={cat} value={cat}>
+                                {cat}
+                            </SelectItem>
+                            ))
+                        )}
+                    </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -277,6 +341,7 @@ export default function EditProductPage() {
                 placeholder="例如：美味的草莓糖葫蘆。"
                 rows={3}
                 className="text-base"
+                disabled={isFetchingProduct || isFetchingCategories || isLoading}
               />
             </div>
             
@@ -288,6 +353,7 @@ export default function EditProductPage() {
                 onChange={(e) => setDataAiHint(e.target.value)}
                 placeholder="例如：candied fruit (最多兩個詞)"
                 className="text-base"
+                disabled={isFetchingProduct || isFetchingCategories || isLoading}
               />
               <p className="text-xs text-muted-foreground">
                 提供一至兩個英文關鍵詞，用於未來 AI 圖片搜尋。如果留空，將根據產品名稱自動產生。
@@ -299,7 +365,7 @@ export default function EditProductPage() {
               <div className="flex flex-col gap-4">
                 <Label 
                     htmlFor="image" 
-                    className="flex flex-col items-center justify-center w-full h-48 border-2 border-border border-dashed rounded-lg cursor-pointer bg-muted/50 hover:bg-muted/80 transition-colors"
+                    className={`flex flex-col items-center justify-center w-full h-48 border-2 border-border border-dashed rounded-lg cursor-pointer bg-muted/50 hover:bg-muted/80 transition-colors ${isFetchingProduct || isFetchingCategories || isLoading ? 'cursor-not-allowed opacity-50' : ''}`}
                 >
                     {displayImageUrl ? (
                         <Image src={displayImageUrl} alt="產品圖片預覽" width={200} height={150} className="max-h-full max-w-full object-contain rounded-md p-1"/>
@@ -312,10 +378,17 @@ export default function EditProductPage() {
                             <p className="text-xs text-muted-foreground">PNG, JPG, GIF (建議 300x200px)</p>
                         </div>
                     )}
-                    <Input id="image" type="file" className="hidden" onChange={handleImageChange} accept="image/png, image/jpeg, image/gif" />
+                    <Input id="image" type="file" className="hidden" onChange={handleImageChange} accept="image/png, image/jpeg, image/gif" disabled={isFetchingProduct || isFetchingCategories || isLoading} />
                 </Label>
                 {displayImageUrl && (
-                    <Button type="button" variant="outline" size="sm" onClick={handleRemoveImage} className="self-start border-destructive text-destructive hover:bg-destructive/10">
+                    <Button 
+                        type="button" 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={handleRemoveImage} 
+                        className="self-start border-destructive text-destructive hover:bg-destructive/10"
+                        disabled={isFetchingProduct || isFetchingCategories || isLoading}
+                    >
                         <Trash2 className="mr-2 h-4 w-4" />
                         移除圖片
                     </Button>
@@ -325,7 +398,7 @@ export default function EditProductPage() {
 
           </CardContent>
           <CardFooter>
-            <Button type="submit" className="w-full text-lg py-6" disabled={isLoading || isFetching}>
+            <Button type="submit" className="w-full text-lg py-6" disabled={isLoading || isFetchingProduct || isFetchingCategories}>
               {isLoading ? (
                 <Loader2 className="mr-2 h-6 w-6 animate-spin" />
               ) : (
