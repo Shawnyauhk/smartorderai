@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { Settings, Save, Loader2, KeyRound, UserSquare, Store, ShieldAlert } from 'lucide-react';
+import { Settings, Save, Loader2, KeyRound, UserSquare, Store, ShieldAlert, Terminal } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const SETTINGS_COLLECTION = 'app_configuration';
@@ -49,7 +49,6 @@ export default function AdminSettingsPage() {
             const settingsDocRef = doc(db, SETTINGS_COLLECTION, SETTINGS_DOC_ID);
             const docSnap = await getDoc(settingsDocRef);
             if (docSnap.exists()) {
-                // Merge fetched settings with initial settings to ensure all keys are present
                 const fetchedData = docSnap.data();
                 const mergedSettings = {
                     ...initialSettings,
@@ -95,8 +94,10 @@ export default function AdminSettingsPage() {
     const handleSaveSettings = async () => {
         setIsSaving(true);
         try {
+            // We are no longer saving credit card keys here, only other payment methods.
+            const { ...otherSettings } = settings;
             const settingsDocRef = doc(db, SETTINGS_COLLECTION, SETTINGS_DOC_ID);
-            await setDoc(settingsDocRef, settings, { merge: true });
+            await setDoc(settingsDocRef, otherSettings, { merge: true });
             toast({
                 title: "設定已儲存",
                 description: "您的支付設定已成功更新到資料庫。",
@@ -131,22 +132,23 @@ export default function AdminSettingsPage() {
                     系統設定
                 </h1>
                 <p className="text-lg text-muted-foreground mt-1">
-                    管理應用程式的各項設定，例如支付方式的商家帳戶資訊。
+                    管理應用程式的各項設定，例如移動支付方式的商戶帳戶資訊。
                 </p>
             </div>
 
-            <Alert variant="destructive" className="bg-red-600/10 border-red-600/50 text-red-800 dark:text-red-300">
-                <ShieldAlert className="h-5 w-5 !text-red-600 dark:!text-red-400" />
-                <AlertTitle className="font-bold text-lg">極度重要安全警告：僅供演示，切勿輸入真實密鑰！</AlertTitle>
+            <Alert variant="default" className="bg-blue-600/10 border-blue-600/50 text-blue-800 dark:text-blue-300">
+                <Terminal className="h-5 w-5 !text-blue-600 dark:!text-blue-400" />
+                <AlertTitle className="font-bold text-lg">信用卡支付設定已轉移</AlertTitle>
                 <AlertDescription className="mt-2 space-y-1">
-                   <p>此頁面僅用於**原型演示和API結構展示**。此處輸入的任何內容都將儲存在客戶端可讀取的 Firestore 資料庫中，這對於真實的 API 金鑰或密碼來說是**極不安全**的。</p>
-                   <p>在真實的生產環境中，敏感金鑰**必須**透過安全的後端服務（如 Firebase Cloud Functions）並使用環境變數進行管理，絕不能暴露在前端或客戶端可訪問的資料庫中。</p>
+                   <p>為了提高安全性，Stripe（信用卡）的 API 金鑰現在透過環境變數進行管理，而不是在此頁面輸入。這是真實生產環境中的最佳實踐。</p>
+                   <p>請在您的專案根目錄下建立一個 `.env.local` 檔案，並在其中添加您的 Stripe 金鑰：</p>
+                   <pre className="text-xs bg-black/10 p-2 rounded-md mt-2 font-mono"><code>NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...<br/>STRIPE_SECRET_KEY=sk_test_...</code></pre>
                 </AlertDescription>
             </Alert>
             
             <Card className="shadow-lg">
                 <CardHeader>
-                    <CardTitle className="text-2xl font-headline text-primary">支付平台設定 (僅供模擬)</CardTitle>
+                    <CardTitle className="text-2xl font-headline text-primary">移動支付平台設定 (僅供模擬)</CardTitle>
                     <CardDescription>
                         為不同的移動支付平台配置您的**模擬**商戶帳戶資訊。
                     </CardDescription>
@@ -160,7 +162,7 @@ export default function AdminSettingsPage() {
                             <TabsTrigger value="octopus">八達通</TabsTrigger>
                         </TabsList>
 
-                        {Object.keys(settings).map((platformKey) => {
+                        {Object.keys(initialSettings).map((platformKey) => {
                              const platform = platformKey as keyof AllPaymentSettings;
                              return (
                                 <TabsContent key={platform} value={platform} className="pt-4">
@@ -169,6 +171,13 @@ export default function AdminSettingsPage() {
                                             <CardTitle className="capitalize font-headline text-xl">{platform}</CardTitle>
                                         </CardHeader>
                                         <CardContent className="space-y-4">
+                                            <Alert variant="destructive">
+                                                <ShieldAlert className="h-4 w-4" />
+                                                <AlertTitle>僅供演示</AlertTitle>
+                                                <AlertDescription>
+                                                    請勿在此處輸入真實的生產密鑰。真實密鑰應在安全的後端環境中管理。
+                                                </AlertDescription>
+                                            </Alert>
                                             <div className="space-y-2">
                                                 <Label htmlFor={`${platform}-merchantId`} className="flex items-center"><Store className="w-4 h-4 mr-2"/>商戶ID (Merchant ID)</Label>
                                                 <Input id={`${platform}-merchantId`} value={settings[platform].merchantId} onChange={e => handleInputChange(platform, 'merchantId', e.target.value)} placeholder="您的商戶ID (模擬)" />
@@ -194,11 +203,9 @@ export default function AdminSettingsPage() {
             <div className="flex justify-end">
                 <Button onClick={handleSaveSettings} disabled={isSaving} size="lg" className="shadow-md hover:shadow-lg transition-shadow">
                     {isSaving ? <Loader2 className="mr-2 h-5 w-5 animate-spin"/> : <Save className="mr-2 h-5 w-5"/>}
-                    {isSaving ? "儲存中..." : "儲存所有設定"}
+                    {isSaving ? "儲存中..." : "儲存移動支付設定"}
                 </Button>
             </div>
         </div>
     );
 }
-
-    
