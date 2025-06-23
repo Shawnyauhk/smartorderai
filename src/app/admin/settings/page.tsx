@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { Settings, Save, Loader2, KeyRound, UserSquare, Store } from 'lucide-react';
+import { Settings, Save, Loader2, KeyRound, UserSquare, Store, ShieldAlert } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const SETTINGS_COLLECTION = 'app_configuration';
@@ -135,19 +135,20 @@ export default function AdminSettingsPage() {
                 </p>
             </div>
 
-            <Alert variant="destructive" className="bg-yellow-500/10 border-yellow-500/50 text-yellow-800 dark:text-yellow-300">
-                <KeyRound className="h-5 w-5 !text-yellow-600 dark:!text-yellow-400" />
-                <AlertTitle className="font-bold">安全警告</AlertTitle>
-                <AlertDescription>
-                    請勿在此處輸入任何真實的 API 金鑰或密碼。此頁面僅為功能演示和配置結構展示。在真實的生產環境中，敏感金鑰應透過安全的後端服務和環境變數進行管理，絕不能直接儲存在客戶端可讀取的資料庫中。
+            <Alert variant="destructive" className="bg-red-600/10 border-red-600/50 text-red-800 dark:text-red-300">
+                <ShieldAlert className="h-5 w-5 !text-red-600 dark:!text-red-400" />
+                <AlertTitle className="font-bold text-lg">極度重要安全警告：僅供演示，切勿輸入真實密鑰！</AlertTitle>
+                <AlertDescription className="mt-2 space-y-1">
+                   <p>此頁面僅用於**原型演示和API結構展示**。此處輸入的任何內容都將儲存在客戶端可讀取的 Firestore 資料庫中，這對於真實的 API 金鑰或密碼來說是**極不安全**的。</p>
+                   <p>在真實的生產環境中，敏感金鑰**必須**透過安全的後端服務（如 Firebase Cloud Functions）並使用環境變數進行管理，絕不能暴露在前端或客戶端可訪問的資料庫中。</p>
                 </AlertDescription>
             </Alert>
             
             <Card className="shadow-lg">
                 <CardHeader>
-                    <CardTitle className="text-2xl font-headline text-primary">支付平台設定</CardTitle>
+                    <CardTitle className="text-2xl font-headline text-primary">支付平台設定 (僅供模擬)</CardTitle>
                     <CardDescription>
-                        為不同的移動支付平台配置您的商家帳戶資訊。
+                        為不同的移動支付平台配置您的**模擬**商戶帳戶資訊。
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -170,15 +171,15 @@ export default function AdminSettingsPage() {
                                         <CardContent className="space-y-4">
                                             <div className="space-y-2">
                                                 <Label htmlFor={`${platform}-merchantId`} className="flex items-center"><Store className="w-4 h-4 mr-2"/>商戶ID (Merchant ID)</Label>
-                                                <Input id={`${platform}-merchantId`} value={settings[platform].merchantId} onChange={e => handleInputChange(platform, 'merchantId', e.target.value)} placeholder="您的商戶ID" />
+                                                <Input id={`${platform}-merchantId`} value={settings[platform].merchantId} onChange={e => handleInputChange(platform, 'merchantId', e.target.value)} placeholder="您的商戶ID (模擬)" />
                                             </div>
                                             <div className="space-y-2">
                                                 <Label htmlFor={`${platform}-apiKey`} className="flex items-center"><UserSquare className="w-4 h-4 mr-2"/>API 金鑰 (API Key)</Label>
-                                                <Input id={`${platform}-apiKey`} value={settings[platform].apiKey} onChange={e => handleInputChange(platform, 'apiKey', e.target.value)} placeholder="您的 API Key" />
+                                                <Input id={`${platform}-apiKey`} value={settings[platform].apiKey} onChange={e => handleInputChange(platform, 'apiKey', e.target.value)} placeholder="您的 API Key (模擬)" />
                                             </div>
                                             <div className="space-y-2">
                                                 <Label htmlFor={`${platform}-apiSecret`} className="flex items-center"><KeyRound className="w-4 h-4 mr-2"/>API 密鑰 (API Secret)</Label>
-                                                <Input id={`${platform}-apiSecret`} type="password" value={settings[platform].apiSecret} onChange={e => handleInputChange(platform, 'apiSecret', e.target.value)} placeholder="您的 API Secret" />
+                                                <Input id={`${platform}-apiSecret`} type="password" value={settings[platform].apiSecret} onChange={e => handleInputChange(platform, 'apiSecret', e.target.value)} placeholder="您的 API Secret (模擬)" />
                                             </div>
                                         </CardContent>
                                     </Card>
@@ -199,3 +200,5 @@ export default function AdminSettingsPage() {
         </div>
     );
 }
+
+    
