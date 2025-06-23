@@ -71,7 +71,11 @@ When parsing the order:
     *   **IMPORTANT FOR "大滿貫" VARIANTS AND SIMILAR PARTIAL MATCHES**: If a user says a term like "豆花滿貫" (missing '大') and the menu explicitly contains "豆花大滿貫", you **MUST** interpret this as a request for "豆花大滿貫" and set \`isAmbiguous\` to \`false\` (or omit it). The same applies if the user says "仙草滿貫" and "仙草大滿貫" is on the menu; interpret it as "仙草大滿貫" without ambiguity. Apply similar logic to other close matches where user input strongly implies a specific full menu item if that item is unique. If "朱古力雞記" is said and "朱古力雞蛋仔" is the only matching chocolate egg waffle, interpret it as "朱古力雞蛋仔".
     *   **CRITICAL FOR SLIGHT VARIATIONS LIKE "沙冰" vs "鮮奶冰"**: If a user requests an item like '開心果沙冰', and the menu explicitly contains '開心果鮮奶冰', you **MUST** recognize this as a request for '開心果鮮奶冰', especially if '開心果鮮奶冰' is the primary pistachio-based cold beverage on the menu. Be flexible with descriptive terms like '沙冰', '鮮奶冰', '冰', '特飲' when the core components (e.g., '開心果') match a unique and relevant menu item. The goal is to map the user's intent to the closest relevant single menu item if the core meaning is clear.
     *   If a user specifies a partial name with a number (e.g., '仙草2', '豆花1', '仙草二號', or even a slight variation like '先做3號' which should be interpreted as likely '仙草三號' if '仙草三號(...full name...)' exists), and a *unique* product in the menu context matches this (e.g., '仙草二號（仙草，地瓜圓，芋圓，黑糖粉條，珍珠）' for '仙草2', or '仙草三號（仙草，地瓜圓，芋圓，珍珠，椰果）' for '先做3號'), you **MUST** identify that specific product. **Crucially, if a quantity is specified with this item (e.g., '兩個仙草三號', '仙草三號兩個', or '我要兩個先做3號'), you MUST apply that specified quantity (e.g., 2 in these examples) to the identified product.** If no quantity is specified with the item, then assume quantity 1. For such direct matches or clear intentions where a unique product is identified, \`isAmbiguous\` should be \`false\` or omitted.
-    *   If the user input is primarily a number that could refer to a numbered series of items (e.g., "三號", "2號", "五號"), and multiple distinct products in the menu context incorporate this number (e.g., menu has '仙草三號（仙草，地瓜圓，芋圓，珍珠，椰果）' and '豆花三號'), you **MUST** identify ALL such distinct products. Each identified product should be a separate entry in the \`orderItems\` array with its full name. For example, if the user says "三號", and both "仙草三號（仙草，地瓜圓，芋圓，珍珠，椰果）" and "豆花三號" are on the menu, your output should include two separate items: one for "仙草三號（仙草，地瓜圓，芋圓，珍珠，椰果）" (quantity 1) and one for "豆花三號" (quantity 1), unless quantities are otherwise specified. These items should NOT be marked as ambiguous; instead, list them as individual concrete items. In this specific case, where a number input is expanded into multiple concrete product items, you should NOT create an additional ambiguous item for the original number term itself (e.g., for "三號"). The output should only contain the identified concrete product items.
+    *   **EXPANDING GENERIC TERMS INTO CONCRETE ITEMS**:
+        *   If the user input is a generic term like a number ("三號", "2號", "五號") or a specific keyword ("大滿貫") that could refer to multiple distinct products, you **MUST** identify ALL such distinct products. Each identified product should be a separate entry in the \`orderItems\` array with its full name.
+        *   Example 1 (Numbered item): If the user says "三號", and the menu has both "仙草三號（仙草，地瓜圓，芋圓，珍珠，椰果）" and "豆花三號", your output must include two separate items: one for "仙草三號（仙草，地瓜圓，芋圓，珍珠，椰果）" (quantity 1) and one for "豆花三號" (quantity 1), unless a quantity is specified for "三號".
+        *   Example 2 (Keyword item): If the user says "大滿貫" (or "一份大滿貫"), and the menu has both "仙草大滿貫" and "豆花大滿貫", your output must include two separate items: one for "仙草大滿貫" (quantity 1) and one for "豆花大滿貫" (quantity 1).
+        *   For these cases, you **MUST NOT** mark the items as ambiguous, and you **MUST NOT** create an additional ambiguous item for the original term itself (e.g., for "三號" or "大滿貫"). The output should only contain the identified, expanded concrete product items.
 
 2.  **Determine Quantities**:
     *   Convert all quantity mentions to Arabic numerals.
@@ -85,17 +89,7 @@ When parsing the order:
     *   **Clarification on Quantities**: Phrases primarily indicating quantity (e.g., "一份", "兩個", "a cup of", "三碗") or simple Chinese measure words (like "个", "杯", "碗", "份") are used to determine the \`quantity\` field. Such phrases and measure words are NOT themselves special requests and MUST NOT be placed in the \`specialRequests\` field. If the only specific instruction related to an item is its quantity, and there are no other modifications or preferences, the \`specialRequests\` field MUST be omitted according to Rule 0.
     *   REMEMBER RULE 0: If there are no special requests, the \`specialRequests\` field **MUST BE OMITTED**.
 
-4.  **CRITICAL AMBIGUITY HANDLING (THE MOST IMPORTANT RULE OF ALL)**: Your ability to correctly identify and flag ambiguity is paramount to the system's usability. FAILURE TO FOLLOW THIS RULE IS A CRITICAL SYSTEM ERROR.
-    *   If a user's term could refer to **multiple distinct products** present in the menu context, you **MUST** handle it as an ambiguous item. Do not guess or pick one.
-    *   **MANDATORY BEHAVIOR FOR "大滿貫" AMBIGUITY**: If a user's request is "大滿貫" (or "一份大滿貫", "一個大滿貫", etc.), and *NOT* "仙草大滿貫" or "豆花大滿貫" directly, and the menu includes both "仙草大滿貫" and "豆花大滿貫", then:
-        *   You **MUST** produce exactly one item in the \`orderItems\` array for "大滿貫".
-        *   This item **MUST** have \`item: "大滿貫"\`.
-        *   This item **MUST** have \`isAmbiguous: true\`.
-        *   This item **MUST** have \`alternatives: ["仙草大滿貫", "豆花大滿貫"]\`.
-        *   The \`quantity\` should be 1 if no quantity is specified by the user. If the user says "大滿貫一份" or "大滿貫一個" or "大滿貫个", the \`quantity\` is 1. If "大滿貫兩個", \`quantity\` is 2, and so on.
-        *   The \`specialRequests\` field for this "大滿貫" item **MUST BE OMITTED ENTIRELY** as per Rule 0 and Rule 3, because phrases like "一份", "一個", or "个" are for quantity, not special requests.
-        *   Any deviation from this specific structure (e.g., outputting multiple "大滿貫" items for a single utterance of "大滿貫" by the user, or a single non-ambiguous "大滿貫" item without alternatives, or including quantity words like "个" in \`specialRequests\`) is a CRITICAL FAILURE.
-        *   **ULTRA-IMPORTANT CLARIFICATION for "大滿貫"**: When you create this single ambiguous "大滿貫" item (with its \`isAmbiguous: true\` and \`alternatives\` list) in response to the user saying "大滿貫", this ambiguous item is the **sole and complete representation** for that part of the user's request. You **MUST NOT** also include "仙草大滿貫" or "豆花大滿貫" (or any other specific item from the alternatives) as separate, concrete items in the \`orderItems\` list if they are your interpretation of that same ambiguous "大滿貫" utterance. The purpose of the ambiguous item is to defer this choice to the user.
+4.  **CRITICAL AMBIGUITY HANDLING (FOR USER CLARIFICATION)**: Your ability to correctly identify and flag ambiguity for user clarification is paramount. This rule applies when a user's term is too generic and expanding it into all possibilities would be impractical (e.g., asking for "雞蛋仔" when there are 10+ types).
     *   **MANDATORY BEHAVIOR FOR GENERIC BASE NAMES (e.g., "雞蛋仔", "奶茶")**: If a user's term is a generic base name (like "雞蛋仔" or its common nickname "雞記") and the menu context contains multiple *specific* items that include this base name (e.g., "原味雞蛋仔", "朱古力雞蛋仔", "麻糬雞蛋仔"), then:
         *   You **MUST** produce exactly one item in the \`orderItems\` array for the generic term.
         *   This item **MUST** have \`item: "雞蛋仔"\` (using the most common form of the generic term if a nickname was used, e.g., "雞蛋仔" for "雞記").
@@ -104,13 +98,8 @@ When parsing the order:
         *   The \`quantity\` should be determined from the user's request for the generic term (e.g., "一份雞蛋仔" means quantity 1).
         *   The \`specialRequests\` field must follow Rule 0.
         *   **ULTRA-IMPORTANT CLARIFICATION for Generic Base Names**: This specific ambiguous item (e.g., the one for \`雞蛋仔\`) is the **sole and complete representation** for that part of the user's request. You **MUST NOT** also include any of the items from the \`alternatives\` list (e.g., "原味雞蛋仔", "朱古力雞蛋仔") as separate, concrete items in the \`orderItems\` list if they are your interpretation of that same ambiguous generic utterance. The purpose of the ambiguous item is to defer this choice to the user.
-    *   In general for ambiguous items:
-        *   You **MUST** set the \`item\` field to the ambiguous term itself as stated by the user (or its common normalized form if it's a nickname for a generic).
-        *   You **MUST** set \`isAmbiguous\` to \`true\`.
-        *   You **MUST** populate the \`alternatives\` array with the full names of ALL potential matching products.
-        *   The quantity should be based on the user's request for the ambiguous term.
     *   If an item is clear and unambiguous (e.g., user says "仙草大滿貫" directly, or "漢堡" if there's only one type of burger, or "豆花滿貫" if it clearly means "豆花大滿貫" based on Rule 1, or "開心果沙冰" if it clearly means "開心果鮮奶冰" based on Rule 1), then \`isAmbiguous\` should be \`false\` or omitted, and \`alternatives\` should be empty or omitted.
-    *   If a user lists multiple items together, parse them individually. For example, "我要雞蛋仔同埋一杯凍檸茶" should result in two separate items, where "雞蛋仔" might be ambiguous and "凍檸茶" might resolve to "檸檬茶" with special requests.
+    *   If a user lists multiple items together, parse them individually. For example, "我要雞蛋仔同埋一杯凍檸茶" should result in two separate items, where "雞蛋仔" might be ambiguous (following this rule) and "凍檸茶" might resolve to "檸檬茶" with special requests.
 
 5.  **Output Consistency**:
     *   Unless an item is ambiguous (see rule 4), ensure the \`item\` field in your output uses the **full and exact common name** for the food/drink item as suggested by the product categories and examples provided.
@@ -119,7 +108,7 @@ When parsing the order:
 Order Text: {{{orderText}}}
 
 Your output MUST be a valid JSON object matching the specified schema.
-Examples of how to interpret (besides the mandatory "大滿貫" and generic "雞蛋仔" examples above):
+Examples of how to interpret (besides the mandatory examples above):
 User says: "唔該，我想要一個雞記，要朱古力味，兩份魚蛋，同埋一杯凍檸茶，少甜。"
 You might parse this into items like:
 - item: "朱古力雞蛋仔", quantity: 1 (Assuming "雞記" + "朱古力味" clearly points to "朱古力雞蛋仔")
@@ -147,7 +136,8 @@ User says: "一杯 開心果沙冰"
 
 
 Remember, for \`specialRequests\`, if there are none, the field **MUST BE OMITTED** (Rule 0).
-For AMBIGUOUS items like "大滿貫" or "雞蛋仔" when multiple products match, you **MUST** follow the exact JSON structure provided in Rule 4, including the **ULTRA-IMPORTANT CLARIFICATIONS**.
+For ambiguous items like "雞蛋仔" where user clarification is needed, you **MUST** follow the exact JSON structure provided in Rule 4.
+For generic terms like "大滿貫" or "三號" that should be expanded, you **MUST** follow Rule 1.
 For near-matches like "豆花滿貫", you should directly map to "豆花大滿貫" if it exists and is unambiguous.
 And critically, for inputs like "我要兩個先做3號", if "先做3號" resolves to "仙草三號(...full name...)", the quantity MUST be 2.
 `,
@@ -168,5 +158,7 @@ const parseOrderFlow = ai.defineFlow(
     
 
     
+
+
 
 
