@@ -12,10 +12,6 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import Stripe from 'stripe';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2024-06-20',
-});
-
 const CreatePaymentIntentInputSchema = z.object({
   amount: z.number().describe('The amount for the payment intent in the smallest currency unit (e.g., cents).'),
 });
@@ -38,6 +34,16 @@ const createPaymentIntentFlow = ai.defineFlow(
     outputSchema: CreatePaymentIntentOutputSchema,
   },
   async ({ amount }) => {
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+    if (!stripeSecretKey) {
+        console.error('Stripe secret key is not set. Please set STRIPE_SECRET_KEY in your environment variables.');
+        throw new Error('Stripe secret key is not configured on the server.');
+    }
+    
+    const stripe = new Stripe(stripeSecretKey, {
+        apiVersion: '2024-06-20',
+    });
+
     try {
       const paymentIntent = await stripe.paymentIntents.create({
         amount: amount,
